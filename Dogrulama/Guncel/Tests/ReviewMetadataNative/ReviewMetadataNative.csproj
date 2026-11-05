@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>YerelDisk.Application.Tests</AssemblyName></PropertyGroup><ItemGroup><Compile Include="Tests.cs"/><Reference Include="YerelDisk.Core"><HintPath>$(ProductDirectory)/YerelDisk.Core.dll</HintPath></Reference></ItemGroup></Project>

@@ -1,0 +1,591 @@
+﻿[
+  {
+    "Id": "PAY-01",
+    "Theme": "Paylaşılan kullanım",
+    "Facts": "Android IDE kaldırılmış; başka Java projesi önbelleği kullanıyor. Bu olgu metadata ile araştırılamaz.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache",
+    "Consequence": [
+      "kaynaklara erişilemiyorsa"
+    ],
+    "Guidance": [
+      "başka projelerin",
+      "Çevrimdışı"
+    ]
+  },
+  {
+    "Id": "PAY-02",
+    "Theme": "Paylaşılan kullanım",
+    "Facts": "Aynı gözlenebilir klasör var; bütün Gradle projeleri bırakılmış. Kullanılmama yine taramayla doğrulanamaz.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache"
+  },
+  {
+    "Id": "PAY-03",
+    "Theme": "Paylaşılan kullanım",
+    "Facts": "Bir IDE kaldırılmış; ikinci .NET projesi özel kaynaktan paket kullanıyor.",
+    "Path": "$HOME\\.nuget\\packages",
+    "Rule": "NUGET-PACKAGES",
+    "Kind": "Conditional",
+    "Consequence": [
+      "derleme durabilir"
+    ],
+    "Guidance": [
+      "özel paket kaynaklarına"
+    ]
+  },
+  {
+    "Id": "PAY-04",
+    "Theme": "Paylaşılan kullanım",
+    "Facts": "Cargo paket kaynağına yerel yama yapılmış; indirme yerel değişikliği geri getirmez.",
+    "Path": "$HOME\\.cargo\\registry\\src",
+    "Rule": "CARGO-SOURCES",
+    "Kind": "Conditional",
+    "Guidance": [
+      "yerel değişikliklerin"
+    ],
+    "Consequence": [
+      "yerel değişiklikleri geri getirmez"
+    ]
+  },
+  {
+    "Id": "PAY-05",
+    "Theme": "Paylaşılan kullanım",
+    "Facts": "Özel model artık kaynağından indirilemiyor; klasör büyük ve uzun süredir değişmemiş.",
+    "Path": "$HOME\\.cache\\huggingface\\hub",
+    "Rule": "HF-HUB",
+    "Kind": "Conditional",
+    "Consequence": [
+      "geri gelmeyebilir"
+    ],
+    "Guidance": [
+      "erişilemeyen"
+    ]
+  },
+  {
+    "Id": "PAY-06",
+    "Theme": "Paylaşılan kullanım",
+    "Facts": "Sanal cihazın içinde test kullanıcısının çalışması var; sistem imajı tekrar indirilebilir.",
+    "Path": "$HOME\\.android\\avd",
+    "Rule": "ANDROID-AVD",
+    "Kind": "Conditional",
+    "Consequence": [
+      "test verileri kaybolabilir"
+    ],
+    "Guidance": [
+      "bu çalışmaları geri getirmez"
+    ]
+  },
+  {
+    "Id": "OYUN-01",
+    "Theme": "Kaldırılmış uygulama",
+    "Facts": "Oyun kaldırılmış; bu veri içinde değerli kayıtlar var. Tarama bunu önbellekten ayıramıyor.",
+    "Path": "$DATA\\Hogwarts Legacy",
+    "Rule": "GAME-Hogwarts Legacy",
+    "Kind": "Conditional",
+    "Consequence": [
+      "kayıtları / ayarları"
+    ],
+    "Guidance": [
+      "kayıtları",
+      "ayrı kopyasını"
+    ]
+  },
+  {
+    "Id": "OYUN-02",
+    "Theme": "Kaldırılmış uygulama",
+    "Facts": "Oyun kaldırılmış; aynı gözlenebilir konumdaki verilerin değeri bilinmiyor.",
+    "Path": "$DATA\\Naughty Dog",
+    "Rule": "GAME-Naughty Dog",
+    "Kind": "Conditional",
+    "Consequence": [
+      "kaldırıldığı doğrulanmadı"
+    ]
+  },
+  {
+    "Id": "VERI-01",
+    "Theme": "Karışmış kişisel veri",
+    "Facts": "Geçici klasöre yerel posta arşivi koyulmuş; dosya büyükler listesine girmiyor.",
+    "Path": "$LOCAL\\Temp",
+    "Rule": "USER-TEMP",
+    "Kind": "Conditional",
+    "Files": [
+      {
+        "Path": "small-mail.pst"
+      }
+    ],
+    "Guidance": [
+      "Posta dosyasının"
+    ],
+    "Risks": "Mail",
+    "Signal": [
+      "Posta",
+      "ipucu"
+    ]
+  },
+  {
+    "Id": "VERI-02",
+    "Theme": "Karışmış kişisel veri",
+    "Facts": "Gradle önbelleğine özel sanal disk koyulmuş; dosya büyükler listesine girmiyor.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Conditional",
+    "Files": [
+      {
+        "Path": "nested\\work.vhdx"
+      }
+    ],
+    "Guidance": [
+      "Sanal diskin"
+    ],
+    "Risks": "VirtualDisk",
+    "Signal": [
+      "Sanal disk"
+    ]
+  },
+  {
+    "Id": "VERI-03",
+    "Theme": "Karışmış kişisel veri",
+    "Facts": "Tarayıcı önbellek altına model kopyalanmış. Profil amacı türün veri kaybı riskini bastıramaz.",
+    "Path": "$LOCAL\\Google\\Chrome\\User Data\\Default\\Cache",
+    "Rule": "BROWSER-CACHE",
+    "Kind": "Conditional",
+    "Files": [
+      {
+        "Path": "custom.gguf"
+      }
+    ],
+    "Guidance": [
+      "Modelin gerekli"
+    ],
+    "Risks": "Model"
+  },
+  {
+    "Id": "VERI-04",
+    "Theme": "Karışmış kişisel veri",
+    "Facts": "Döküm süren bir destek incelemesinin tek kopyası; içeriği okunmamalı.",
+    "Path": "$LOCAL\\CrashDumps",
+    "Rule": "CRASH-DUMPS",
+    "Kind": "Conditional",
+    "Files": [
+      {
+        "Path": "issue.dmp"
+      }
+    ],
+    "Guidance": [
+      "Dökümün süren"
+    ],
+    "Risks": "Diagnostics",
+    "Consequence": [
+      "özel veri"
+    ]
+  },
+  {
+    "Id": "VERI-05",
+    "Theme": "Karışmış kişisel veri",
+    "Facts": "Aynı önbellekte dört farklı riskli ad var; tek tür uyarısı yeterli değil.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Conditional",
+    "Files": [
+      {
+        "Path": "a.vhdx"
+      },
+      {
+        "Path": "b.pst"
+      },
+      {
+        "Path": "c.gguf"
+      },
+      {
+        "Path": "d.dmp"
+      }
+    ],
+    "Guidance": [
+      "Sanal diskin",
+      "Posta dosyasının",
+      "Modelin",
+      "Dökümün"
+    ],
+    "Risks": "VirtualDisk, Mail, Model, Diagnostics",
+    "Signal": [
+      "Sanal disk",
+      "Posta",
+      "Model",
+      "Döküm"
+    ]
+  },
+  {
+    "Id": "VERI-06",
+    "Theme": "Karışmış kişisel veri",
+    "Facts": "İçerikte kişisel belge olabilir ama bilinen dört ad/uzantı ipucu yok; yokluk güvence olmaz.",
+    "Path": "$LOCAL\\Temp",
+    "Rule": "USER-TEMP",
+    "Kind": "Temporary",
+    "Files": [
+      {
+        "Path": "work.docx"
+      }
+    ]
+  },
+  {
+    "Id": "KORU-01",
+    "Theme": "Korunan alan",
+    "Facts": "Kurulum deposuna posta dosyası karışmış. Tür riski elle silmeyin korumasını azaltamaz.",
+    "Path": "$DATA\\Package Cache",
+    "Rule": "PACKAGE-CACHE",
+    "Kind": "Protected",
+    "Files": [
+      {
+        "Path": "personal.pst"
+      }
+    ],
+    "Risks": "Mail",
+    "Signal": [
+      "Elle silmeyin",
+      "Posta"
+    ]
+  },
+  {
+    "Id": "KORU-02",
+    "Theme": "Korunan alan",
+    "Facts": "Installer içinde sanal disk adına rastlanıyor. Koruma sürmeli.",
+    "Path": "$WINDOWS\\Installer",
+    "Rule": "WINDOWS-INSTALLER",
+    "Kind": "Protected",
+    "Files": [
+      {
+        "Path": "work.vhdx"
+      }
+    ],
+    "Risks": "VirtualDisk"
+  },
+  {
+    "Id": "KORU-03",
+    "Theme": "Korunan alan",
+    "Facts": "Bileşen deposu büyük; paylaşılan boyut ve sistem bakımı sınırlamaları geçerli.",
+    "Path": "$WINDOWS\\WinSxS",
+    "Rule": "WINDOWS-COMPONENTS",
+    "Kind": "Protected",
+    "Guidance": [
+      "geri kazanılabilir alan sayma"
+    ],
+    "Consequence": [
+      "Windows bakımı"
+    ]
+  },
+  {
+    "Id": "KORU-04",
+    "Theme": "Korunan alan",
+    "Facts": "Önceki Windows verisinde taşınmamış kullanıcı dosyaları var.",
+    "Path": "C:\\Windows.old",
+    "Rule": "WINDOWS-OLD",
+    "Kind": "Protected",
+    "Consequence": [
+      "kişisel dosyalar"
+    ],
+    "Guidance": [
+      "kullanıcı dosyalarının",
+      "dönüş ihtiyacını"
+    ]
+  },
+  {
+    "Id": "AD-01",
+    "Theme": "Yanıltıcı ad / konum",
+    "Facts": "Proje içinde caches adı verilmiş kişisel veri var; genel ad Gradle eşleşmesi sayılmaz.",
+    "Path": "$HOME\\Projects\\caches"
+  },
+  {
+    "Id": "AD-02",
+    "Theme": "Yanıltıcı ad / konum",
+    "Facts": "Gerçek önbelleğin yanındaki caches-backup bağımsız yedek klasörü.",
+    "Path": "$HOME\\.gradle\\caches-backup"
+  },
+  {
+    "Id": "AD-03",
+    "Theme": "Yanıltıcı ad / konum",
+    "Facts": "Android Studio adı verilen arşiv, bilinen SDK yapısı değil.",
+    "Path": "$HOME\\Android Studio"
+  },
+  {
+    "Id": "AD-04",
+    "Theme": "Yanıltıcı ad / konum",
+    "Facts": "Windows.old adlı sıradan proje klasörü; sistem kökünün yanında değil.",
+    "Path": "$HOME\\Projects\\Windows.old"
+  },
+  {
+    "Id": "AD-05",
+    "Theme": "Yanıltıcı ad / konum",
+    "Facts": "Installer adlı sıradan kullanıcı klasörü; Windows bakım deposu değil.",
+    "Path": "$HOME\\Installer"
+  },
+  {
+    "Id": "AD-06",
+    "Theme": "Yanıltıcı ad / konum",
+    "Facts": "Chrome profilinin bütünü önbellek diye sınıflandırılmamalı.",
+    "Path": "$LOCAL\\Google\\Chrome\\User Data\\Default"
+  },
+  {
+    "Id": "AD-07",
+    "Theme": "Yanıltıcı ad / konum",
+    "Facts": "Beklenmeyen profil adıyla taşınmış Cache klasörü; varsayılan profil kanıtı yok.",
+    "Path": "$LOCAL\\Google\\Chrome\\User Data\\Personal\\Cache"
+  },
+  {
+    "Id": "AD-08",
+    "Theme": "Yanıltıcı ad / konum",
+    "Facts": "Farklı diske taşınmış gerçek Gradle önbelleği; mevcut konum kuralının kapsamı dışında.",
+    "Path": "D:\\Moved-Gradle\\caches"
+  },
+  {
+    "Id": "SDK-01",
+    "Theme": "Yapı benzerliği",
+    "Facts": "Klasör adı SDK; iki doğrudan işaret var. İçerik veya gerçek araç kimliği yine doğrulanamaz.",
+    "Path": "D:\\Android_SDK",
+    "Rule": "ANDROID-SDK-STRUCTURE",
+    "Kind": "Conditional",
+    "Markers": [
+      "platform-tools",
+      "build-tools"
+    ],
+    "Guidance": [
+      "gerçekten bir SDK",
+      "Flutter, Unity, ADB"
+    ]
+  },
+  {
+    "Id": "SDK-02",
+    "Theme": "Yapı benzerliği",
+    "Facts": "SDK adlı projede platform-tools/build-tools yanında .git klasörü var; projeyi araç deposu sayma.",
+    "Path": "D:\\SDK",
+    "Markers": [
+      "platform-tools",
+      "build-tools",
+      ".git"
+    ]
+  },
+  {
+    "Id": "SDK-03",
+    "Theme": "Yapı benzerliği",
+    "Facts": "Yalnız genel platforms/build-tools adları var; güçlü araç işareti yok.",
+    "Path": "D:\\SDK",
+    "Markers": [
+      "platforms",
+      "build-tools"
+    ]
+  },
+  {
+    "Id": "SDK-04",
+    "Theme": "Yapı benzerliği",
+    "Facts": "İki işaretten biri okunamadı; görünmeyen işaretin varlığına güvenilemez.",
+    "Path": "D:\\SDK",
+    "Markers": [
+      "platform-tools",
+      "build-tools"
+    ],
+    "UnusableMarkers": [
+      "build-tools"
+    ]
+  },
+  {
+    "Id": "SINIR-01",
+    "Theme": "Kapsam ve gözlem",
+    "Facts": "Posta arşivi hariç dalda; güncel gözleme katılmamalı.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache",
+    "Files": [
+      {
+        "Path": "skip\\archive.pst"
+      }
+    ],
+    "Excluded": [
+      "skip"
+    ]
+  },
+  {
+    "Id": "SINIR-02",
+    "Theme": "Kapsam ve gözlem",
+    "Facts": "Eski retained-list fallback var ve posta arşivi hariç dalda; risk sayılmamalı.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache",
+    "Files": [
+      {
+        "Path": "skip\\archive.pst"
+      }
+    ],
+    "Excluded": [
+      "skip"
+    ],
+    "Source": "retained"
+  },
+  {
+    "Id": "SINIR-03",
+    "Theme": "Kapsam ve gözlem",
+    "Facts": "Retained fallback posta dosyasının kendisi hariç tutulmuş; risk sayılmamalı.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache",
+    "Files": [
+      {
+        "Path": "archive.pst"
+      }
+    ],
+    "Excluded": [
+      "archive.pst"
+    ],
+    "Source": "retained"
+  },
+  {
+    "Id": "SINIR-04",
+    "Theme": "Kapsam ve gözlem",
+    "Facts": "Final metadata boş; retained listede bayat posta dosyası var. Final kaynak belirleyici olmalı.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache",
+    "Source": "empty-final",
+    "Retained": [
+      "stale.pst"
+    ]
+  },
+  {
+    "Id": "SINIR-05",
+    "Theme": "Kapsam ve gözlem",
+    "Facts": "Dosyanın güncel kimliği doğrulanmamış; adını pozitif risk kanıtı sayma.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache",
+    "Files": [
+      {
+        "Path": "stale.pst",
+        "Unverified": true
+      }
+    ]
+  },
+  {
+    "Id": "SINIR-06",
+    "Theme": "Kapsam ve gözlem",
+    "Facts": "Retained dosya başka seçilmemiş kökten gelmiş; bu adayın kanıtı değil.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache",
+    "Source": "retained",
+    "Files": [
+      {
+        "Path": "D:\\Other\\archive.pst"
+      }
+    ]
+  },
+  {
+    "Id": "SINIR-07",
+    "Theme": "Kapsam ve gözlem",
+    "Facts": "Kapsam değişimi global olarak çözülememiş; aday sunulamaz.",
+    "Path": "$HOME\\.gradle\\caches",
+    "ScopeChanged": true
+  },
+  {
+    "Id": "SINIR-08",
+    "Theme": "Kapsam ve gözlem",
+    "Facts": "Kısmi ölçümle posta adı görüldü; iki uyarı birlikte kalmalı.",
+    "Path": "$LOCAL\\Temp",
+    "Rule": "USER-TEMP",
+    "Kind": "Conditional",
+    "Partial": true,
+    "Files": [
+      {
+        "Path": "work.pst"
+      }
+    ],
+    "Guidance": [
+      "ölçümün sınırını",
+      "Posta dosyasının"
+    ],
+    "Risks": "Mail",
+    "Signal": [
+      "Kısmi",
+      "Posta"
+    ]
+  },
+  {
+    "Id": "SINIR-09",
+    "Theme": "Kapsam ve gözlem",
+    "Facts": "Kullanıcı taramayı durdurmuş; görünen amaç etkin kullanım kanıtı olamaz.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache",
+    "Cancelled": true,
+    "Guidance": [
+      "ölçümün sınırını"
+    ]
+  },
+  {
+    "Id": "KULTUR-01",
+    "Theme": "Kültür ve harf",
+    "Facts": "Türkçe kültürde büyük/küçük harfli yerel yol aynı kuralı bulmalı.",
+    "Path": "$HOME\\.GRADLE\\CACHES",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache"
+  },
+  {
+    "Id": "GELECEK-01",
+    "Theme": "Geleceğe uyum",
+    "Facts": "Bugünkü motor üretmez: sunum modeline yalnız bilinmeyen 16 risk biti verildi.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache",
+    "FutureRisk": 16,
+    "Risks": "16",
+    "Signal": [
+      "Ek tür"
+    ]
+  },
+  {
+    "Id": "GELECEK-02",
+    "Theme": "Geleceğe uyum",
+    "Facts": "Bugünkü motor üretmez: bilinen sanal disk ile bilinmeyen 16 biti birlikte.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache",
+    "FutureRisk": 17,
+    "Risks": "17",
+    "Signal": [
+      "Sanal disk",
+      "Ek tür"
+    ]
+  },
+  {
+    "Id": "GELECEK-03",
+    "Theme": "Geleceğe uyum",
+    "Facts": "Bugünkü motor üretmez: korunan konumda bilinen posta ve bilinmeyen tür birleşimi.",
+    "Path": "$DATA\\Package Cache",
+    "Rule": "PACKAGE-CACHE",
+    "Kind": "Protected",
+    "FutureRisk": 18,
+    "Risks": "18",
+    "Signal": [
+      "Posta",
+      "Ek tür",
+      "Elle silmeyin"
+    ]
+  },
+  {
+    "Id": "GELECEK-04",
+    "Theme": "Geleceğe uyum",
+    "Facts": "Bugünkü motor üretmez: dört bilinen tür ve bir bilinmeyen bit birlikte.",
+    "Path": "$HOME\\.gradle\\caches",
+    "Rule": "GRADLE-CACHES",
+    "Kind": "Cache",
+    "FutureRisk": 31,
+    "Risks": "31",
+    "Signal": [
+      "Sanal disk",
+      "Posta",
+      "Model",
+      "Döküm",
+      "Ek tür"
+    ]
+  }
+]

@@ -1,0 +1,36 @@
+YerelDisk 1.18.0 — Windows x64 portable package
+
+1. Extract the entire ZIP to a folder.
+2. Open YerelDisk.exe.
+3. Choose the folders to scan and start the scan.
+
+The package includes the .NET runtime. You can run it without the SDK,
+Visual Studio, or a separate .NET installation. Keep the DLLs beside the EXE.
+The app runs with standard user permissions. The initial release targets
+Windows 11 x64. Windows may display an unknown publisher warning because the
+app is unsigned. You can leave your security software enabled.
+
+F6 opens details. Opening a location shows it in Explorer. The app does not
+delete or move files. Review candidates provide experimental clues. Whether
+data is in use or safe to delete remains unverified. The app does not treat
+large or old data as unnecessary.
+
+The app has no networking, telemetry, or automatic updates. Normal scans
+inspect file system metadata without reading file contents. CSV export and
+clipboard actions require a user request. Application records are optional.
+The Settings button reads application names, publishers, versions, and
+installation paths locally from the 32-bit and 64-bit HKLM/HKCU Uninstall
+sources. Records outside the selected scan roots may be inspected. CSV
+inclusion is a separate option that starts off. Copying the full F6 details
+includes the visible clues for the selection.
+
+To remove the app, close it and delete the extracted folder. CSV files and
+clipboard copies you saved remain separate. Windows and .NET manage their own
+system records separately.
+
+Find the source, usage and measurement limits, and new releases at
+https://github.com/Cosmosprey/YerelDisk
+
+See LICENSE-YerelDisk.txt for the app license. The distributed .NET components
+have their own licenses and third-party notices under Lisanslar. The SHA256
+checksum checks integrity and provides no digital signature.

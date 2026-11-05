@@ -1,0 +1,22 @@
+# Build/test output and local caches
+**/bin/
+**/obj/
+**/Derleme/
+**/.build-home/
+**/.packages/
+**/Kosular/
+**/Yerel-Derleme/
+**/SON-KOSU.txt
+artifacts/
+.vs/
+.vscode/
+*.user
+*.suo
+*.pdb
+*.zip
+# Local credentials and personal exports do not belong in the repository
+.env
+.env.*
+*.pfx
+*.p12
+*.key

@@ -1,0 +1,51 @@
+<UserControl x:Class="YerelDisk.Wpf.DistributionView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:YerelDisk.Wpf">
+  <UserControl.Resources>
+    <local:DistributionSelectionConverter x:Key="SameSelection" />
+  </UserControl.Resources>
+  <ScrollViewer x:Name="ChartScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="18,16"
+      AutomationProperties.Name="Klasörlerin mantıksal boyut dağılımı">
+    <StackPanel>
+      <TextBlock Text="ALAN DAĞILIMI · → ile alt klasöre girin" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Accent}"
+          ToolTip="Adı seçerek ayrıntıyı görün; ok düğmesiyle klasöre girin. Tab ile düğmeler arasında gezebilirsiniz." />
+      <TextBlock Text="{Binding Distribution.Caption}" TextWrapping="Wrap" Margin="0,7,0,12" />
+      <ItemsControl x:Name="Bars" ItemsSource="{Binding Distribution.Segments}" IsEnabled="{Binding CanUseDistribution}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border CornerRadius="8" Padding="11,9" Margin="0,0,0,8" BorderThickness="1" ToolTip="{Binding ToolTip}">
+              <Border.Style><Style TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource Soft}" /><Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+                <Style.Triggers><DataTrigger Value="True"><DataTrigger.Binding><MultiBinding Converter="{StaticResource SameSelection}">
+                  <Binding Path="Folder" /><Binding Path="DataContext.SelectedRow" RelativeSource="{RelativeSource AncestorType=UserControl}" />
+                </MultiBinding></DataTrigger.Binding><Setter Property="Background" Value="{DynamicResource Selection}" /><Setter Property="BorderBrush" Value="{DynamicResource Accent}" /></DataTrigger></Style.Triggers>
+              </Style></Border.Style>
+              <Grid><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="6" /></Grid.RowDefinitions>
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                  <Grid Margin="0,0,8,0">
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
+                      <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Visible" /><Style.Triggers><DataTrigger Binding="{Binding HasFolder}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                    </TextBlock>
+                    <Button Content="{Binding Title}" Click="SelectFolder" Padding="0,3" BorderThickness="0" Background="Transparent"
+                        HorizontalContentAlignment="Left" MinHeight="28" ToolTip="{Binding ToolTip}"
+                        Visibility="{Binding HasFolder, Converter={StaticResource Visible}}">
+                      <Button.ContentTemplate><DataTemplate><TextBlock Text="{Binding}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /></DataTemplate></Button.ContentTemplate>
+                    </Button>
+                  </Grid>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SizeLabel}" FontWeight="SemiBold" Margin="0,0,12,0" /><TextBlock Text="{Binding ShareLabel}" Foreground="{DynamicResource Muted}" />
+                  </StackPanel>
+                  <Button Grid.Column="2" Content="→" Click="EnterFolder" Padding="8,3" MinHeight="28" Margin="10,0,0,0" IsEnabled="{Binding CanEnter}"
+                      Visibility="{Binding HasFolder, Converter={StaticResource Visible}}" ToolTip="Alt klasöre gir" AutomationProperties.Name="Alt klasöre gir" />
+                </Grid>
+                <TextBlock Grid.Row="1" Text="{Binding Note}" Foreground="{DynamicResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,3,0,8" />
+                <ProgressBar Grid.Row="2" Value="{Binding BarValue, Mode=OneWay}" Maximum="100" BorderThickness="0" Background="{DynamicResource Line}" Foreground="{DynamicResource Accent}" IsHitTestVisible="False" />
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Border Background="{DynamicResource Soft}" CornerRadius="8" Padding="12" Margin="0,6,0,0"><TextBlock Text="{Binding Distribution.Notice}" Style="{StaticResource MutedText}" FontSize="11" /></Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

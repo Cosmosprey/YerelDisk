@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Kaynak/Core/YerelDisk.Core.csproj" />
+  <Project Path="Kaynak/Application/YerelDisk.Application.csproj" />
+  <Project Path="Kaynak/Wpf/YerelDisk.Wpf.csproj" />
+</Solution>

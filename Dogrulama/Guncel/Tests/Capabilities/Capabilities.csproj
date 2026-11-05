@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><AssemblyName>YerelDisk.Validation.Capabilities</AssemblyName></PropertyGroup>
+  <ItemGroup><Compile Include="Tests.cs" /></ItemGroup>
+</Project>
