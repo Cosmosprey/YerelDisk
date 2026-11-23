@@ -261,48 +261,6 @@ internal sealed partial class ScanRun
         Issue(owner, path, "Ölçüm doğrulanamadı: aynı dosya başka bir konumda da görüldü; doğrulama sırasında taşınmış olabilir.");
     }
     void AggregateObservations()
-    {
-        result.PhysicalLinks.Clear(); result.HardLinkAliases = 0;
-        // Stale single-link observations can repeat an ID too. Bound the initial
-        // reservation instead of trusting observation count as unique ID count.
-        result.PhysicalLinks.EnsureCapacity(IdentityCapacity.ForObservations(nodes));
-        var aliases = new HashSet<(uint Volume, ulong Id)>();
-        var retained = new PriorityQueue<(ScanNode Node, FileObservation File), long>();
-        foreach (var node in nodes)
-        {
-            var folder = node.Folder;
-            folder.LogicalBytes = node.OwnStreams.Size; folder.AllocatedBytes = node.OwnStreams.Allocated;
-            folder.OwnStreams = node.OwnStreams.ExtraStreams; folder.OwnStreamBytes = node.OwnStreams.ExtraStreamBytes;
-            folder.FileCount = node.Files.Count;
-            foreach (var file in node.Files)
-            {
-                folder.LogicalBytes += file.Size;
-                if (file.Allocated is { } allocation)
-                {
-                    if (file.Id != 0 && !result.PhysicalLinks.TryAdd((file.Volume, file.Id), new(folder, allocation, file.Name, file.Size, file.HardLinked)))
-                    {
-                        var first = result.PhysicalLinks[(file.Volume, file.Id)];
-                        // Claude 1.9.1: one link at both observations is not a hard link but a move
-                        // that the bounded rounds could not settle: show both paths as unverified.
-                        if (!file.HardLinked && !first.Linked) { StaleDuplicate(first.Owner, first.Name); StaleDuplicate(folder, file.Name); }
-                        else { result.HardLinkAliases++; aliases.Add((file.Volume, file.Id)); }
-                    }
-                    else folder.AllocatedBytes += allocation;
-                }
-                if (retained.Count < fileLimit) retained.Enqueue((node, file), file.Size);
-                else if (retained.TryPeek(out _, out long floor) && file.Size > floor)
-                { retained.Dequeue(); retained.Enqueue((node, file), file.Size); }
-            }
-        }
-        // Keep the hint-free snapshot until all selected roots are merged. Removing
-        // a moved/shrunken winner can require a source candidate outside its old K.
-        result.FileCandidates = nodes.SelectMany(node => node.Files.Select(file =>
-            (node.Folder, file with { HardLinked = file.HardLinked || aliases.Contains((file.Volume, file.Id)) })));
-        result.Files = retained.UnorderedItems.Select(item =>
-        {
-            var file = item.Element.File;
-            return new FileEntry(Path.Combine(item.Element.Node.Folder.Path, file.Name), file.Size, file.Allocated, file.Modified,
-                file.HardLinked || aliases.Contains((file.Volume, file.Id)), file.Note, file.ExtraStreams, file.ExtraStreamBytes, file.Unverified);
-        }).OrderByDescending(file => file.Size).ThenBy(file => file.Path, StringComparer.OrdinalIgnoreCase).ToList();
-    }
+        => ObservationAggregate.Apply(result, nodes.Select(node => new ObservationOwner(node.Folder,
+            node.OwnStreams, node.Files, node.Files.Count)), fileLimit, IdentityCapacity.ForObservations(nodes), StaleDuplicate);
 }

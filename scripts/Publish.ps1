@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$OutputRoot, [string]$RuntimeVersion = '10.0.14')
+param([string]$OutputRoot, [string]$RuntimeVersion = '10.0.15')
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if (!$OutputRoot) { $OutputRoot = Join-Path $repo 'artifacts' }
@@ -50,7 +50,7 @@ foreach ($id in @('microsoft.netcore.app.runtime.win-x64','microsoft.windowsdesk
 foreach ($source in $sourceBefore) { if ((Get-FileHash -LiteralPath (Join-Path $repo $source.Path)).Hash -ne $source.SHA256) { throw 'Source changed during publication.' } }
 $sourceBefore | Export-Csv -LiteralPath (Join-Path $package 'SOURCE-SHA256SUMS.csv') -NoTypeInformation -Encoding UTF8
 $manifest = @(Get-ChildItem -LiteralPath $package -Recurse -File | Sort-Object FullName | ForEach-Object { '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash, $_.FullName.Substring($package.Length+1).Replace('\','/') })
-$manifest | Set-Content -LiteralPath (Join-Path $package 'FILES-SHA256SUMS.txt') -Encoding UTF8
+[IO.File]::WriteAllText((Join-Path $package 'FILES-SHA256SUMS.txt'), ($manifest -join [char]10) + [char]10, [Text.Encoding]::ASCII)
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $zip = [IO.Compression.ZipFile]::Open($archivePath, [IO.Compression.ZipArchiveMode]::Create)
 try {

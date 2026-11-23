@@ -9,10 +9,14 @@ internal static class VerifiedScan
     internal const int MaxAttempts = 3;
 
     internal static ScanResult Scan(IEnumerable<string> paths, IProgress<ScanProgress>? progress,
-        CancellationToken token, int fileLimit, int workers, IEnumerable<string>? excludedPaths = null)
+        CancellationToken token, int fileLimit, int workers, IEnumerable<string>? excludedPaths = null, long refreshIndexBudgetBytes = 0,
+        IReadOnlyList<RefreshRoot>? expectedRoots = null)
     {
+        RefreshIndex.ValidateBudget(refreshIndexBudgetBytes);
         if (fileLimit < 1 || workers is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(fileLimit));
         string[] roots = MultiScan.NormalizeRootPaths(paths);
+        if (expectedRoots != null && !roots.SequenceEqual(expectedRoots.Select(root => root.Path), StringComparer.Ordinal))
+            throw new ArgumentException("Beklenen kök kimliklerinin kapsamı eşleşmiyor.", nameof(expectedRoots));
         var exclusions = ScanExclusions.Create(roots, excludedPaths);
         var states = roots.Select(path => new RootState(path)).ToArray();
         var watch = Stopwatch.StartNew();
@@ -46,7 +50,10 @@ internal static class VerifiedScan
                 result.Cancelled |= token.IsCancellationRequested;
                 MarkUnsafeRecords(result);
             }
-            var combined = Merge(states, fileLimit, watch.Elapsed, exclusions);
+            var combined = Merge(states, fileLimit, watch.Elapsed, exclusions, refreshIndexBudgetBytes, token);
+            if (combined.RefreshIndex?.State == RefreshIndexState.Cancelled) combined.Cancelled = true;
+            combined.RootVolumeIds = states.Where(state => !state.Blocked && state.VolumeId.HasValue)
+                .ToDictionary(state => state.Path, state => state.VolumeId!.Value, StringComparer.Ordinal);
             exclusions.ApplyTo(combined);
             FileHints.Apply(combined);
             combined.Elapsed = watch.Elapsed;
@@ -65,6 +72,14 @@ internal static class VerifiedScan
                 {
                     state.Pin = NativeDirectory.OpenRoot(state.Path, false);
                     state.Identity = NativeMetadata.Identity(state.Pin.Handle);
+                    state.VolumeId = state.Pin.TryGetVolumeId();
+                }
+                if (expectedRoots != null)
+                {
+                    var expected = expectedRoots.Single(root => root.Path == state.Path);
+                    if (expected.Id == 0 || expected.VolumeId is null || expected.VolumeId == Guid.Empty
+                        || state.Identity != (expected.Volume, expected.Id) || state.VolumeId != expected.VolumeId)
+                        throw new RootScopeChangedException("Beklenen kök kimliği değişti; yeni hedef taranmadı.");
                 }
                 state.Pin.VerifyBinding(state.Path); state.Pin.EnsureRootLocation();
 
@@ -74,7 +89,7 @@ internal static class VerifiedScan
                 long otherIssues = states.Where(s => !ReferenceEquals(s, state)).Sum(s => s.Result?.IssueCount ?? 0);
                 var forward = new ForwardProgress(p => progress?.Report(new(otherFiles + p.Files, otherFolders + p.Folders,
                     otherBytes + p.Bytes, otherIssues + p.Issues, p.Current, watch.Elapsed, p.Phase)));
-                var next = new ScanRun(state.Path, forward, token, fileLimit, [], new ScanPolicy(state.Identity), exclusions).Execute(workers);
+                var next = new ScanRun(state.Path, forward, token, fileLimit, [], new ScanPolicy(state.Identity), exclusions, refreshIndexBudgetBytes > 0).Execute(workers);
                 next.RetainedFileLimit = fileLimit;
                 state.Result = next;
                 if (next.ScopeChanged || next.Failed) MarkPrevious(next);
@@ -142,15 +157,25 @@ internal static class VerifiedScan
                 || (safeDirectories.TryGetValue(parent, out bool safe) ? !safe : !result.CanUsePath(file.Path))))
                 result.Files[i] = file with { Unverified = true };
         }
+        if (result.FileCandidates is { } candidates)
+            result.FileCandidates = candidates.Select(item => (item.Owner,
+                item.File with { Unverified = item.File.Unverified
+                    || (safeDirectories.TryGetValue(item.Owner.Path.TrimEnd('\\'), out bool safe) && !safe)
+                    || (result.UnverifiedPaths.Count != 0 && result.UnverifiedPaths.Contains(Path.Combine(item.Owner.Path, item.File.Name))) }));
     }
 
-    static ScanResult Merge(RootState[] states, int fileLimit, TimeSpan elapsed, ScanExclusions exclusions)
+    static ScanResult Merge(RootState[] states, int fileLimit, TimeSpan elapsed, ScanExclusions exclusions, long refreshIndexBudgetBytes, CancellationToken token)
     {
+        RefreshIndex? CaptureIndex() => refreshIndexBudgetBytes == 0 ? null : RefreshIndex.Capture(
+            states.Select(state => state.Result!),
+            states.Select(state => new RefreshRoot(state.Path, state.Identity.Volume, state.Identity.Id, state.VolumeId)),
+            exclusions.Paths, refreshIndexBudgetBytes, token);
         if (states.Length == 1)
         {
             var single = states[0].Result!;
+            single.RefreshIndex = CaptureIndex();
             single.ObservedEvidence = ObservedFileEvidence.Capture([single], exclusions);
-            single.PhysicalLinks.Clear(); single.PhysicalLinks.TrimExcess(); single.FileCandidates = null; single.Elapsed = elapsed;
+            single.PhysicalLinks.Clear(); single.PhysicalLinks.TrimExcess(); single.FileCandidates = null; single.RefreshDirectoryCandidates = null; single.Elapsed = elapsed;
             single.VerificationHistory.AddRange(states[0].History);
             return single;
         }
@@ -196,9 +221,11 @@ internal static class VerifiedScan
         }
         foreach (var part in refill) RefillCandidates(part, stalePaths, fileLimit);
         var observedEvidence = ObservedFileEvidence.Capture(states.Select(state => state.Result!), exclusions);
-        foreach (var state in states) state.Result!.FileCandidates = null;
+        var refreshIndex = CaptureIndex();
+        foreach (var state in states) { state.Result!.FileCandidates = null; state.Result.RefreshDirectoryCandidates = null; }
         var combined = new ScanResult(new FolderEntry($"Seçilen klasörler ({states.Length})", null)) { RetainedFileLimit = fileLimit, Elapsed = elapsed };
         combined.ObservedEvidence = observedEvidence;
+        combined.RefreshIndex = refreshIndex;
         if (states.Any(s => s.Result!.Timings != null))
             combined.Timings = new(
                 TimeSpan.FromTicks(states.Sum(s => s.Result!.Timings?.InitialScan.Ticks ?? 0)),
@@ -230,6 +257,9 @@ internal static class VerifiedScan
     static void RefillCandidates(ScanResult part, HashSet<string> stalePaths, int limit)
     {
         if (part.FileCandidates == null) return;
+        var candidates = part.FileCandidates;
+        part.FileCandidates = candidates.Where(item => !stalePaths.Contains(Path.Combine(item.Owner.Path, item.File.Name)))
+            .Select(item => (item.Owner, item.File with { Unverified = item.File.Unverified || !part.CanUsePath(Path.Combine(item.Owner.Path, item.File.Name)) }));
         var heap = new PriorityQueue<FileEntry, long>();
         foreach (var (owner, file) in part.FileCandidates)
         {
@@ -254,6 +284,7 @@ internal static class VerifiedScan
         internal string Path { get; } = path;
         internal NativeDirectory? Pin;
         internal (uint Volume, ulong Id) Identity;
+        internal Guid? VolumeId;
         internal ScanResult? Result;
 
         internal bool Blocked;

@@ -42,8 +42,8 @@ internal static class RowValues
     {
         int order = key switch
         {
-            "Size" => (a is FolderEntry { Measurement: MeasurementState.Unknown }, b is FolderEntry { Measurement: MeasurementState.Unknown }) switch
-            { (true, false) => 1, (false, true) => -1, _ => SizeOf(a).CompareTo(SizeOf(b)) }, "Allocated" => Nullable.Compare(AllocatedOf(a), AllocatedOf(b)),
+            "Size" => SizeOf(a).CompareTo(SizeOf(b)),
+            "Allocated" => Nullable.Compare(AllocatedOf(a), AllocatedOf(b)),
             "Count" => (a is FolderEntry f ? f.FileCount : 0).CompareTo(b is FolderEntry g ? g.FileCount : 0),
             "Issues" => (a is FolderEntry f ? f.IssueCount : 0).CompareTo(b is FolderEntry g ? g.IssueCount : 0),
             "Streams" => StreamsOf(a).CompareTo(StreamsOf(b)),

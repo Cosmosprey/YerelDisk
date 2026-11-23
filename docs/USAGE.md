@@ -1,73 +1,85 @@
 # Usage and measurement limits
 
-1. **Choose folders** and add one or more scan roots. To avoid scanning all of
-   C:, for example, select Program Files, Program Files (x86), and ProgramData
-   individually. In the same window, add paths below the selected roots to
-   the exclusions list.
-2. **Start the scan.** Stop keeps partial results. Hidden folders are scanned
-   within your permissions. Standard user permissions are sufficient for
-   normal use.
-3. **Scan summary** shows the scope and times for the initial scan, verification,
-   and targeted refresh. Changed folders receive up to two targeted refresh
-   rounds. The scan operates on a live file system, and refresh ends after
-   those rounds.
-4. Double-click a subfolder or press Enter on a selected folder row. Use the
-   up arrow or Alt+Up to return. **Ctrl+F** searches the current list, and × or
-   Esc clears it. Navigation may be limited for unmeasurable paths or paths
-   with an earlier measurement.
-5. **F6** shows scope, risks, and explanations. The open-location action shows
-   the path in Explorer. **Save CSV** writes the rows in the visible filter
-   and sort order. File backups are separate from CSV reports.
+Version 1.29.4 rejects references with no reliable folder measurements and
+case-insensitive duplicate/nested roots. Healthy measured areas of partial scans
+can still be compared. During filesystem changes, repeated single-link identities
+are counted once within a root using the largest uncertain observation; that
+representative is not proof of the latest size or a currently usable path.
+
+The interface is in Turkish. English names below describe the corresponding actions.
+
+## Scan and browse
+
+1. Choose one or more local folders. To avoid a complete C: scan, select folders
+   such as Program Files, Program Files (x86) and ProgramData individually.
+   Exclude unwanted branches in the same scope dialog.
+2. **New full scan** uses the configured next-scan roots/exclusions and clears the
+   old result when it starts. Stop can leave explicitly partial results.
+3. Browse folders by double-click/Enter; go up with Alt+Up. Ctrl+F searches the
+   current view; Esc or the clear button clears the search. F6 opens details.
+4. **Save CSV** exports visible rows in their applied filter/sort order. Opening
+   a location shows it in Explorer without executing the selected file.
+
+Verification and bounded repair run over a live filesystem. This is neither an
+atomic snapshot nor continuous monitoring. Watch status and warning labels.
+Unknown/partial/previous measurements are not zero-sized or empty folders.
 
 ## Views
 
-- **Folders** shows measured sizes. The disk usage view shows the 12 largest
-  matching subfolders and the remaining groups. Shares use the selected
-  folder's measured logical total as the denominator, which stays consistent
-  as you search. CSV exports all filtered folder rows.
-- **Large files** shows the largest K files retained during the scan, independent
-  of the folder you are browsing. It covers that limited set of files. You can
-  change K for the session.
-- **Review candidates / Rule matches** shows clues about location, structure,
-  and type, along with removal effects and a suggested first check. Notes
-  record your assessment for the session separately from technical evidence.
-- **Other large areas** shows measurable subtrees that the rules do not recognize.
-  Their purpose and use are unknown. The view avoids repeating parent and child
-  sizes in the same list. Files directly in scan roots and split ancestor folders
-  have no separate rows. Check the Large files view for those files.
-- **Warnings** shows access issues, missing measurements, and unverified locations.
+- **Folders:** measured logical/allocated sizes, table, file-population summary,
+  and distribution of the 12 largest matching subfolders plus remaining groups.
+  Distribution percentages use the current folder's measured logical total.
+- **Large files:** the largest K retained files, independent of the open folder.
+  It is a limited set, not a listing of every scanned file.
+- **Review candidates / Rule matches:** purpose/risk clues, removal effects and
+  a suggested first check. Personal assessment notes apply only to the session.
+- **Other large areas:** measurable, non-overlapping subtrees without a recognized
+  purpose. Direct files in roots/split ancestors are inspected through Large files.
+- **Warnings:** access errors, missing measurements and unverified locations.
 
-A parent folder may appear even when one of its branches is excluded. Its size
-covers only the scanned portion. The excluded branch has no measured size or
-contents in the results. Treat missing or unmeasurable space as unknown.
+An included parent can contain excluded descendants. Its total covers the scanned
+portion; the excluded branch has no measured contents. Review the scope in F6.
 
-## Settings
+## Folder measurements and comparison
 
-Worker count controls how many metadata operations run in parallel. The right
-value depends on the hardware, disk, and directory tree. More workers may
-provide little speedup. Start with Auto or the default and compare timings
-over the same scan scope. Settings explains each option. Preferences apply
-to the next scan.
+After a completed, compatible full measurement, open **Scan difference**, save
+that measurement as a reference, then scan the same scope later and open the
+reference to compare. The reference stores folder measurements and scope, not
+file contents or a complete per-file history. Compressed `.yereldisk` files are
+bounded and integrity-checked; older supported JSON references can also be read.
+Compression and checksums provide no encryption or authenticity guarantee.
 
-Application record inspection is optional. [Data read and sharing behavior](PRIVACY.md).
+The reference library shows up to 10 recent entries and can remember a default
+save folder. Removing a recent entry only changes the list. Reference files have
+no automatic expiration or deletion; manage them separately. Profiles hold up to
+20 root/exclusion combinations. Both libraries start session-only; opt into
+Remember if you want local persistence. [Stored data](PRIVACY.md).
+
+## Remeasure and refresh
+
+**Remeasure all** uses the current result's original roots and exclusions, keeps
+old results visible during preparation, and replaces them only after validation.
+Cancellation or failure preserves the old measurement. Editable next-scan paths
+are separate. [Selected-folder behavior and fallback](REFRESH.md).
+
+Worker, list and in-memory index options explain their costs in Settings. More
+workers do not guarantee a speedup. Auto or 4–6 workers is a reasonable comparison
+starting point for a directory-rich SSD workload; test the same scope on your
+hardware. The optional 64/128 MiB index is session-only and defaults off. This is
+an index accounting budget, not a process-RAM limit.
 
 ## Known limits
 
-- Logical totals and measured allocated space describe storage measurements.
-  Recoverable space depends on hard links, compression, extra streams, access,
-  and partial results.
-- OneDrive, CompactOS, and WOF files classified as reparse points may be skipped.
-  In particular, this can make the Windows folder total smaller than its
-  physical disk usage.
-- Protected, partial, and earlier measurements have separate labels. Changes
-  during scanning can leave results incomplete, non-atomic, or missing some
-  files.
-- The app accepts local paths. It rejects network, UNC, and device paths and
-  may reject subst paths and short 8.3 names.
-- Speed varies with hardware, cache state, and permissions. Test counts describe
-  test coverage. Real-world accuracy and safe deletion require separate evidence.
-- The initial release targets Windows 11 x64. Physical DPI and multi-monitor
-  configurations, file systems, and cloud providers have limited verification.
-- The ready-to-run package is unsigned. Runtime security updates require a
-  new YerelDisk package because the app bundles the runtime and has no
-  automatic updater.
+- Logical size, measured allocated space and recoverable space are different.
+  Hard links, sparse files, compression, extra streams and partial coverage matter.
+- Reparse points, including some OneDrive/CompactOS/WOF files, may be skipped;
+  Windows-folder totals can therefore be incomplete.
+- Network/UNC/device roots are rejected. Subst drives and short 8.3 names may be
+  rejected by canonical-location checks.
+- Concurrent changes and unavailable paths can leave warnings or incomplete data.
+  No observed warning is a promise that every possible file was measured.
+- Mixed-time results cannot be saved or compared as one fresh full reference;
+  remeasure the full scope first.
+- Real hardware, cloud providers, unusual filesystems, physical DPI/multi-monitor
+  setups and long-running stress have limited verification. The supported release
+  target is Windows 11 x64; the unsigned package has no automatic updater.

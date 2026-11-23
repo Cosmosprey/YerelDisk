@@ -49,7 +49,7 @@ internal static class OtherAreaUiTests
                 Check(model.IsKnownReview && model.Rows.Count == 1 && model.Rows[0] is ReviewCandidate && window.ResultsGrid.Columns.Any(c => c.SortMemberPath == "ReviewSignal"), "Switching back restores original recognized table and classification");
                 Check(ReportSnapshot.Capture(model).Unrecognized == false && report.Unrecognized && report.Items.Length == 2002, "Captured export remains immutable after list mode changes");
                 window.ReviewCollectionSelector.SelectedValue = 1; await window.PendingView; model.SelectedRow = fake.Apps; await model.EnterAsync(fake.Apps); await window.NavigateAsync(model.View);
-                Check(model.IsFolderView && model.Rows.Single() is FolderEntry f && f.Name == "Nested" && window.ResultsGrid.RowHeight == 42, "Discovery folder opens in ordinary folder navigation with original layout");
+                Check(model.IsFolderView && model.Rows.Single() is FolderEntry f && f.Name == "Nested" && window.ResultsGrid.RowHeight == 38, "Discovery folder opens with standard folder row height");
                 await window.NavigateAsync(WorkspaceView.Review); Check(model.IsUnrecognized && window.ResultsGrid.Columns.Count == 4, "Returning to review restores discovery list and template");
                 model.Search = "no-such-folder"; await model.RefreshAsync(); Check(model.IsEmpty && model.EmptyMessage.Contains("filtre"), "Empty filtered discovery has a useful explanation");
                 PresentationTraceSources.DataBindingSource.Flush(); Check(errors.ToString().Length == 0, "No binding errors during selection, filters, mode changes or navigation");

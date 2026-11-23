@@ -1,75 +1,80 @@
 # Privacy and data scope
 
-YerelDisk has no networking, telemetry, account sign-in, or automatic updates.
-GitHub downloads, developer CI, and packaging are separate from the app.
-Windows, .NET, Explorer, and security software manage their own activity and
-records separately.
+YerelDisk has no networking, telemetry, account sign-in or automatic updates.
+GitHub, developer CI, SDK/package downloads, Windows, .NET, Explorer and security
+software have their own activity separate from the app.
 
-## Normal scan
+## Normal scans
 
-Within the selected local roots, the app reads file and folder names, paths,
-sizes, timestamps, file system identifiers, and measurement metadata.
-File contents, processes, WMI/Win32_Product, and command output stay outside
-the scan. The app does not follow symbolic links, junctions, or cloud
-placeholders. An excluded branch is skipped without opening it. Listing its
-parent can still reveal the branch name in metadata. The app rejects network,
-UNC, and device roots.
+Inside the selected local roots the app reads names, paths, sizes, timestamps,
+file identifiers and filesystem metadata, including measurable extra-stream
+sizes. It does not read arbitrary file contents or follow links/cloud placeholders.
+An excluded branch is not opened, though listing its parent can reveal its name.
+Network, UNC and device roots are rejected. No process inventory, WMI/Win32_Product,
+project configuration inspection or command-output collection is part of scanning.
 
-The app does not delete or move files or change their contents or permissions.
-Results and settings stay in the session. The app does not save reports or
-debug inventories automatically.
+The app has no cleanup commands that delete, move, modify or change permissions
+on scanned data. Results normally remain in memory. The optional refresh index
+retains the same metadata longer for the current session; it is not written to disk.
+
+## References, profiles and optional persistence
+
+Saving a reference explicitly writes folder paths, logical sizes, reliability
+flags, measurement time, scope/exclusions and volume identifiers to the chosen
+file. Opening one reads that selected file; it does not read the referenced
+folders automatically. References are compressed/integrity-checked, not encrypted.
+No file payload is included and no automatic reference-file expiration occurs.
+
+Profiles hold names, roots and exclusions. Reference preferences hold a default
+folder and up to 10 recent paths/times/sizes. Both are session-only until you
+choose Remember. That choice can create these local preference files:
+
+- `%LOCALAPPDATA%\YerelDisk-profiller.json`
+- `%LOCALAPPDATA%\YerelDisk-referanslar.json`
+
+Relevant profile/reference dialogs can reload these previously opted-in records.
+Keeping Remember enabled permits later updates. Turning it off removes that
+application preference file; the app may also remove its own failed temporary
+save file. Atomic saves may replace the selected destination after successful
+preparation. These operations are separate from scanned-file cleanup.
+
+Removing a recent entry does not delete its reference file. There is no automatic
+expiry or reference-folder sweep. Copies in saved references, exports, backups
+and the clipboard remain separate. Managed memory has no guaranteed secure erasure.
 
 ## Optional application records
 
-This feature is off by default. After a disk scan, explicitly request
-application record inspection in Settings. Startup, a scan, or changing tabs
-leaves the records unread until you request inspection.
+Inspection starts off and runs only after a user request in Settings. It reads
+local 32-bit/64-bit `Software\Microsoft\Windows\CurrentVersion\Uninstall` entries
+in HKLM and the current user's HKCU. It may see records outside scan roots.
+The four content values are `InstallLocation`, `DisplayName`, `Publisher` and
+`DisplayVersion`; key names, types and sizes are also checked for bounded traversal.
 
-- Sources are the 32-bit and 64-bit views of
-  `Software\Microsoft\Windows\CurrentVersion\Uninstall` in local HKLM and
-  the current user's HKCU only.
-- The reader uses `InstallLocation`, `DisplayName`, `Publisher`, and
-  `DisplayVersion`. It also reads key names, value types, and sizes to limit
-  traversal.
-- The reader opens path components as link objects and checks only the type
-  and size of `SymbolicLinkValue` to reject redirects. It leaves the target
-  data unread.
-- It may inspect records for applications outside the selected scan roots.
-  The results show clues only for scanned, usable rows.
-- The reader leaves referenced files and executables unopened. It skips
-  uninstaller, DisplayIcon, InstallSource, and command fields, keeps environment
-  variables unexpanded, and limits its scope to the local registry and current
-  user's profile. It runs with standard permissions and uses read-only access.
+The reader opens registry components as link objects, checks the type/size of
+`SymbolicLinkValue` and rejects redirects without reading the target value data.
+It does not open listed executables/files, expand environment variables, or read
+uninstaller, DisplayIcon, InstallSource or command fields. Access is read-only
+and uses normal user permissions.
 
-A record match is a literal installation path match. Current installation
-status, active use, ownership, and whether files are needed remain unverified.
-A missing match is inconclusive. Portable apps, empty paths, and stale
-records can leave these sources incomplete. Names alone do not establish
-which applications use shared Gradle or NuGet stores. Project configuration
-and contents stay outside the inspection.
+Limits: 4096 subkeys, 6 MiB total value data, 64 KiB per value; 512 name, 256
+publisher, 128 version and 4096 path characters. Cancellation and an eight-second
+budget are checked between OS calls; a call in progress may exceed that time.
+Incomplete, limited and failed sources are qualified separately.
 
-The limits are 4096 subkeys, 6 MiB of total value data read, and 64 KiB per
-value. Character limits are 512 for names, 256 for publishers, 128 for versions,
-and 4096 for paths. The reader checks cancellation and an eight-second read
-budget between OS calls. An OS call already in progress can run beyond that
-budget. The app reports incomplete, failed, and limited sources separately.
+A path match is an installation clue. Installed state, active use, ownership,
+shared-store use and necessity remain unverified. A missing match is inconclusive.
+Starting/replacing a scan, Stop/Clear clues, reset and close invalidate old clues;
+late results must not restore an earlier generation.
 
-Starting a new scan, using Stop or Clear clues, resetting settings, or closing
-the app clears the live clues. Late results from an earlier task cannot
-restore them. Managed memory has no guaranteed secure erasure. Previously
-exported reports and clipboard copies remain separate.
+## Sharing
 
-## User sharing actions
+CSV, references, profile names/paths, F6 copies and screenshots may contain private
+information. Application-record CSV inclusion is a separate opt-in, limited to
+visible report rows; a 4096-match truncation note preserves the main table.
+The full machine inventory is not exported. Full F6 copies include the visible
+record clues for the selected row. Review all artifacts before sharing them.
 
-CSV reports and copies of paths or full details may contain file and folder
-names. Application record clues are off by default in CSV. The separate
-setting adds explanations only for the rows in the report. At the 4096-match
-limit, the report adds a truncation note and keeps the main table rows.
-The export excludes the full machine inventory. **Copy full text** in the F6
-details includes the visible application record information for the selection.
-Review reports and screenshots before sharing them.
-
-The open-location action opens Explorer when you request it and leaves the
-selected file unexecuted. Windows may manage Explorer's recent items and system
-records separately. For support, prefer sample paths and small synthetic
-scenarios over real disk dumps.
+Explorer opens only on request and does not execute the selected file. Windows
+may manage recent-item/system records separately. Removing the portable folder
+does not remove opted-in preferences, saved references, exports or clipboard data.
+Use a small synthetic example rather than personal disk dumps for support.

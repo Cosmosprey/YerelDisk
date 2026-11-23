@@ -131,6 +131,25 @@ internal sealed class NativeDirectory : IDisposable
 
     public void EnsureLocation() => CheckLocation(allowDeleted: true);
     public void EnsureRootLocation() => CheckLocation(allowDeleted: false);
+
+    internal Guid? TryGetVolumeId()
+    {
+        const uint volumeNameGuid = 1;
+        const string prefix = @"\\?\Volume{";
+        var path = new StringBuilder(512);
+        uint length = GetFinalPathNameByHandleW(Handle, path, (uint)path.Capacity, volumeNameGuid);
+        if (length >= path.Capacity && length <= 32768 + 64)
+        {
+            path = new StringBuilder((int)length + 1);
+            length = GetFinalPathNameByHandleW(Handle, path, (uint)path.Capacity, volumeNameGuid);
+        }
+        if (length == 0 || length >= path.Capacity) return null;
+        string name = path.ToString();
+        return name.Length > prefix.Length + 36 && name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            && name[prefix.Length + 36] == '}'
+            && Guid.TryParseExact(name.AsSpan(prefix.Length, 36), "D", out var id) && id != Guid.Empty ? id : null;
+    }
+
     void CheckLocation(bool allowDeleted)
     {
         var attributes = NativeMetadata.Attributes(Handle);
@@ -160,7 +179,7 @@ internal sealed class NativeDirectory : IDisposable
         }
     }
 
-    SafeFileHandle OpenRelative(string name, bool directory, bool enumerate)
+    SafeFileHandle OpenRelative(string name, bool directory, bool enumerate, bool readData = false)
     {
         if (name is "." or ".." || name.Length == 0 || name.IndexOfAny(['\\', '/', ':', '\0']) >= 0)
             throw new IOException("Tek bileşenli dosya adı bekleniyordu.");
@@ -177,7 +196,7 @@ internal sealed class NativeDirectory : IDisposable
                 Length = Marshal.SizeOf<ObjectAttributes>(), RootDirectory = Handle.DangerousGetHandle(),
                 ObjectName = stringBuffer, Attributes = 0x1040 // OBJ_DONT_REPARSE | OBJ_CASE_INSENSITIVE
             };
-            uint access = 0x100080u | (directory && enumerate ? 1u : 0u); // attributes + synchronize (+ list directory)
+            uint access = 0x100080u | (directory && enumerate || readData ? 1u : 0u); // attributes + synchronize (+ list / explicit own-store read)
             // FILE_OPEN + synchronous + NO_RECALL + OPEN_REPARSE_POINT.
             // Windows rejects NO_RECALL together with FILE_DIRECTORY_FILE. Open directories
             // type-neutral and verify the Directory attribute on the returned handle before use.
@@ -215,6 +234,9 @@ internal sealed class NativeDirectory : IDisposable
     }
 
     public SafeFileHandle OpenFile(string name) => OpenRelative(name, false, false);
+    // Only an explicit application-owned preference-store read uses data rights.
+    // Scan metadata opens above continue to request attributes only.
+    internal SafeFileHandle OpenFileForRead(string name) => OpenRelative(name, false, false, readData: true);
 
     public IEnumerable<NativeEntry> Entries()
     {

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -61,7 +61,7 @@ internal static class ExclusionUiTests
                 dialog.Close();
                 model.Roots.Add(@"C:\example"); model.Exclusions.Add(@"C:\example\omit"); await model.ScanAsync();
                 Check(model.RootsLabel.Contains("1 hariç") && model.Summary!.Coverage.Contains("hariç tutuldu"), "Pending scope and finished summary are visibly distinct");
-                main.Width = 940; main.Height = 680; main.SummaryExpander.IsExpanded = false; await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); main.UpdateLayout();
+                main.Width = 940; main.Height = 680; await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); main.UpdateLayout();
                 Check(main.ScopeNoticeCard.Visibility == Visibility.Visible, "Intentional exclusions keep a notice even with zero access warnings");
                 Screenshot((FrameworkElement)main.Content, Path.Combine(output, "result-940-dark.png"));
                 model.SelectedRow = model.Rows.OfType<FolderEntry>().First();

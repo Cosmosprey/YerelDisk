@@ -66,6 +66,10 @@ internal sealed record SelectionDetails(string Title, string Path, string Summar
         {
             sections.Add(new("Klasör bilgileri", folder.Measurement == MeasurementState.Unknown ? "Dosya sayısı, boyut ve ayrılan alan bilinmiyor."
                 : $"{folder.FileCount:N0} dosya · {folder.IssueCount:N0} uyarı\nÖlçülen ayrılan alan: {PresentationText.Size(folder.AllocatedBytes)}\nKlasörün kendi ek akışları: {folder.OwnStreams:N0} · {PresentationText.Size(folder.OwnStreamBytes)}"));
+            if (folder.Measurement is not (MeasurementState.Unknown or MeasurementState.Previous)
+                && scan?.CanUsePath(folder.Path) == true && scan.ObservedEvidence?.Population.Owners.TryGetValue(folder, out var own) == true)
+                sections.Add(new("Dosya yapısı · doğrudan dosyalar",
+                    $"Özetlenebilen {own.Count:N0} doğrudan dosya adı · {own.Small:N0} adet 0–4 KiB · {own.Empty:N0} adet 0 bayt.\nAlt klasörler bu kısa özete dahil değildir. Alt klasörlerle birlikte dağılım için Klasörler görünümündeki Dosya yapısı düğmesini kullanın. Küçük dosya olması gereksizlik kanıtı değildir."));
         }
         else if (item is ScanIssue issue) sections.Add(new("Ölçüm uyarısı", issue.Reason, true));
         else sections.Add(new("Nasıl kullanılır?", review ? "Bir aday seçerek amacını, kaldırmanın olası etkisini ve inceleme koşullarını okuyun. Gereksizlik ve etkin kullanım doğrulanmaz." : "Bir kayıt seçerek konumunu, boyutunu ve açıklamasını inceleyin."));

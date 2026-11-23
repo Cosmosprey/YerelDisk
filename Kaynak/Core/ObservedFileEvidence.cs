@@ -35,6 +35,7 @@ internal sealed class ObservedFileEvidence
     readonly Dictionary<FolderEntry, FolderRiskSummary> owners = [];
     internal IReadOnlyDictionary<FolderEntry, FolderRiskSummary> Owners => owners;
     internal long VisitedNames { get; private set; }
+    internal FilePopulationEvidence Population { get; private set; } = new();
 
     // Called after all root/binding and cross-root move checks, BEFORE releasing
     // the snapshots that already exist for repair/top-K refill. No extra I/O.
@@ -43,26 +44,19 @@ internal sealed class ObservedFileEvidence
     internal static ObservedFileEvidence Capture(IEnumerable<ScanResult> sources, ScanExclusions? exclusions = null)
     {
         var evidence = new ObservedFileEvidence();
+        var population = new FilePopulationEvidence.Builder();
         foreach (var source in sources)
         {
             if (source.FileCandidates == null) continue;
-            FolderEntry? lastOwner = null;
-            bool ownerUsable = false;
+            population.BeginSource(source, exclusions);
             foreach (var (owner, file) in source.FileCandidates)
             {
+                population.Add(owner, file);
                 evidence.VisitedNames++;
                 if (file.Unverified) continue;
                 var risk = FileHints.RiskFor(file.Name);
                 if (risk == FileDataRisk.None || !CanonicalName(file.Name)) continue;
-                if (!ReferenceEquals(lastOwner, owner))
-                {
-                    lastOwner = owner;
-                    ownerUsable = owner.Measurement is not (MeasurementState.Unknown or MeasurementState.Previous)
-                        && ReviewRules.CanonicalLocal(owner.Path) != null
-                        && WithinRoots(source.RootPaths, owner.Path)
-                        && source.CanUsePath(owner.Path);
-                }
-                if (!ownerUsable || exclusions?.SkipsEntry(owner.Path, file.Name) == true) continue;
+                if (!population.IsOwnerUsable(owner) || exclusions?.SkipsEntry(owner.Path, file.Name) == true) continue;
                 // Owner safety already covers every ancestor. Only an exact
                 // file-level uncertainty needs a full path here.
                 if (source.UnverifiedPaths.Count != 0 && source.UnverifiedPaths.Contains(Path.Combine(owner.Path, file.Name))) continue;
@@ -70,13 +64,9 @@ internal sealed class ObservedFileEvidence
                 summary.Add(risk, file.Name);
             }
         }
+        evidence.Population = population.Complete();
         return evidence;
     }
     static bool CanonicalName(string name) => name.Length > 0 && !name.EndsWith('.') && !name.EndsWith(' ')
         && name.AsSpan().IndexOfAny('\\', '/', ':') < 0 && !name.Contains('\0');
-    static bool WithinRoots(IReadOnlyList<string> roots, string path)
-    {
-        for (int i = 0; i < roots.Count; i++) if (ScanExclusions.SameOrBelow(path, roots[i])) return true;
-        return false;
-    }
 }

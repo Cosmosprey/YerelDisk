@@ -22,7 +22,7 @@ namespace YerelDisk;
 // is finished; subtree totals are folded after all workers have stopped. Shared state: the work
 // queue, the counters (Interlocked), the largest-files heap, the issue list and the hard link set (locks).
 internal sealed partial class ScanRun(string rootPath, IProgress<ScanProgress>? progress, CancellationToken token,
-    int fileLimit, HashSet<(uint Volume, ulong Id)> seenLinks, ScanPolicy? policy, ScanExclusions? exclusions = null)
+    int fileLimit, HashSet<(uint Volume, ulong Id)> seenLinks, ScanPolicy? policy, ScanExclusions? exclusions = null, bool retainRefreshMetadata = false)
 {
     public ScanRun(string rootPath, IProgress<ScanProgress>? progress, CancellationToken token,
         int fileLimit, HashSet<(uint Volume, ulong Id)> seenLinks) : this(rootPath, progress, token, fileLimit, seenLinks, null) { }
@@ -149,11 +149,29 @@ internal sealed partial class ScanRun(string rootPath, IProgress<ScanProgress>? 
         // including the global multi-root merge. Measurement notes remain on each record.
         if (policy == null) result.Files = largest.UnorderedItems.Select(x => x.Element)
             .OrderByDescending(x => x.Size).ThenBy(x => x.Path, StringComparer.OrdinalIgnoreCase).ToList();
+        if (retainRefreshMetadata && policy != null)
+            result.RefreshDirectoryCandidates = RefreshDirectories(nodes, order, nodeMap);
         result.Folders = order.Count;
         result.Elapsed = watch.Elapsed;
         result.Timings = new(initialElapsed, verificationElapsed, refreshElapsed);
         Report(rootPath, force: true);
         return result;
+    }
+
+    static IEnumerable<(FolderEntry Owner, RefreshDirectoryData Data)> RefreshDirectories(
+        List<ScanNode> nodes, List<FolderEntry> order, ConcurrentDictionary<FolderEntry, ScanNode> map)
+    {
+        // Keep the same owner order as FileCandidates; skipped rows have no
+        // opened ScanNode and are appended as explicit unknown observations.
+        foreach (var node in nodes)
+            yield return (node.Folder, new(node.Folder.Path, node.Parent?.Folder.Path, node.Folder.ObservedId,
+                node.OwnStreams, node.Fingerprint, node.Folder.Measurement, node.Enumerated,
+                node.Folder.LogicalBytes, node.Folder.AllocatedBytes, node.Folder.FileCount, node.Folder.IssueCount));
+        foreach (var folder in order)
+            if (!map.ContainsKey(folder))
+                yield return (folder, new(folder.Path, folder.Parent?.Path, folder.ObservedId,
+                    default, default, folder.Measurement, false, folder.LogicalBytes,
+                    folder.AllocatedBytes, folder.FileCount, folder.IssueCount));
     }
 
     void Worker()

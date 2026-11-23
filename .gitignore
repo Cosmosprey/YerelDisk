@@ -5,6 +5,9 @@
 **/.build-home/
 **/.packages/
 **/Kosular/
+**/Mutasyon-Kosular/
+**/Olcum-Kosular/
+**/Arsiv/
 **/Yerel-Derleme/
 **/SON-KOSU.txt
 artifacts/
@@ -13,6 +16,10 @@ artifacts/
 *.user
 *.suo
 *.pdb
+*.exe
+*.dll
+*.nupkg
+*.log
 *.zip
 # Local credentials and personal exports do not belong in the repository
 .env

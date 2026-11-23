@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -44,7 +44,7 @@ internal static class DistributionUiTests
                 Check(window.ResultsGrid.Visibility==Visibility.Collapsed&&window.DistributionChart.Visibility==Visibility.Visible,"Mode button activates bounded graph and hides table");
                 foreach(bool dark in new[]{false,true})foreach(var size in new[]{(940d,680d),(1480d,940d)})
                 {
-                    window.SetTheme(dark);window.Width=size.Item1;window.Height=size.Item2;window.SummaryExpander.IsExpanded=false;window.DistributionChart.ChartScroll.ScrollToTop();await Settle(model);window.UpdateLayout();string label=$"chart-{size.Item1}-{(dark?"dark":"light")}";
+                    window.SetTheme(dark);window.Width=size.Item1;window.Height=size.Item2;window.DistributionChart.ChartScroll.ScrollToTop();await Settle(model);window.UpdateLayout();string label=$"chart-{size.Item1}-{(dark?"dark":"light")}";
                     Check(window.DistributionChart.ActualHeight>=150&&window.DistributionChart.ActualWidth>=350,"Chart viewport stays usable: "+label+" height="+window.DistributionChart.ActualHeight+" width="+window.DistributionChart.ActualWidth);
                     Check(window.DistributionChart.Bars.Items.Count<=15&&Descendants<ProgressBar>(window.DistributionChart).All(p=>double.IsFinite(p.Value)&&p.Value>=0&&p.Value<=100),"Rendered bars stay bounded and proportional: "+label);
                     var area=(FrameworkElement)window.Content;Point end=window.DistributionModeButton.TranslatePoint(new Point(window.DistributionModeButton.ActualWidth,window.DistributionModeButton.ActualHeight),area);

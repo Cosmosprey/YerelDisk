@@ -3,6 +3,8 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -29,38 +31,68 @@ internal static class UiTests
             app.MainWindow = window; window.Show();
             try
             {
-                Check(window.SummaryCard.Visibility == Visibility.Collapsed, "Summary is hidden before first scan");
+                Check(window.FindName("SummaryExpander") == null, "The scan summary has no UI element");
                 model.Roots.Add(@"C:\example"); await model.ScanAsync(); await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-                Check(window.SummaryCard.Visibility == Visibility.Visible && !window.SummaryExpander.IsExpanded, "Completed summary starts collapsed");
+                Check(model.Rows[0] is FolderEntry { Name: "largest" } && model.Rows[^1] is FolderEntry { Measurement: MeasurementState.Unknown },
+                    "Default order shows largest measured folders first and unknown size last");
+                await model.SortAsync("Size");
+                Check(model.Rows[0] is FolderEntry { Name: "zero" } && model.Rows[^1] is FolderEntry { Measurement: MeasurementState.Unknown },
+                    "Ascending size keeps unknown after the measured zero");
+                await model.SortAsync("Allocated");
+                Check(model.Rows[0] is FolderEntry { Name: "largest" } && model.Rows[^1] is FolderEntry { Measurement: MeasurementState.Unknown },
+                    "Descending allocated space keeps unavailable values last");
+                await model.SortAsync("Allocated");
+                Check(model.Rows[0] is FolderEntry { Name: "zero" } && model.Rows[^1] is FolderEntry { Measurement: MeasurementState.Unknown },
+                    "Ascending allocated space keeps unavailable values last");
+                await model.ScanAsync(); window.ConfigureColumns();
+                Check(model.SortKey == "Size" && model.SortDescending && model.Rows[0] is FolderEntry { Name: "largest" },
+                    "A new scan returns to descending size");
                 foreach (var size in new[] { (940d, 680d), (1480d, 940d) })
                     foreach (bool dark in new[] { false, true })
                     {
                         window.Width = size.Item1; window.Height = size.Item2; window.SetTheme(dark);
-                        window.SummaryExpander.IsExpanded = true;
                         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); window.UpdateLayout();
                         string label = $"{size.Item1}x{size.Item2}-{(dark ? "dark" : "light")}";
-                        Console.WriteLine($"Layout {label}: window={window.ActualWidth}x{window.ActualHeight}; summary={window.SummaryCard.ActualHeight}; metrics={window.Metrics.ActualHeight}; table={window.ResultsGrid.ActualHeight}");
-                        Console.WriteLine("Rows: " + string.Join(", ", ((Grid)((StackPanel)window.SummaryCard.Parent).Parent).RowDefinitions.Select(row => row.ActualHeight)));
-                        Check(window.ResultsGrid.ActualHeight >= 90, "Expanded summary leaves usable table: " + label + " height=" + window.ResultsGrid.ActualHeight);
-                        Check(window.ScopeNoticeCard.Visibility == Visibility.Collapsed, "Expanded summary replaces duplicate warning band: " + label);
-                        var header = (TextBlock)window.SummaryExpander.Header;
-                        var point = header.TranslatePoint(new Point(header.ActualWidth, header.ActualHeight), (FrameworkElement)window.Content);
-                        Check(header.ActualHeight > 0 && point.X <= ((FrameworkElement)window.Content).ActualWidth + 1, "Summary heading stays inside window: " + label);
-                        Check(Descendants<TextBlock>(window.SummaryExpander).Any(text => text.Text.Contains("İlk tarama 3,00 sn")), "Phase timing is visibly bound: " + label);
+                        Check(window.ResultsGrid.RowHeight == 38 && window.ResultsGrid.ColumnHeaderHeight == 40
+                            && window.ResultsGrid.ActualHeight >= window.ResultsGrid.ColumnHeaderHeight + 24,
+                            $"Usable table: {label} (table {window.ResultsGrid.ActualHeight:N0}, window {window.ActualHeight:N0}, metrics {window.Metrics.ActualHeight:N0}, warning {window.ScopeNoticeCard.ActualHeight:N0}, visible {window.ResultsGrid.IsVisible})");
+                        Check(window.ScopeNoticeCard.IsVisible, "Scope warnings stay visible: " + label);
+                        Check(window.Metrics.IsVisible, "Existing metrics stay visible: " + label);
+                        Check(VirtualizingPanel.GetIsVirtualizing(window.ResultsGrid)
+                            && VirtualizingPanel.GetScrollUnit(window.ResultsGrid) == ScrollUnit.Pixel, "Virtualized pixel scrolling: " + label);
                         var area = (FrameworkElement)window.Content; var dpi = VisualTreeHelper.GetDpi(area);
                         var bitmap = new RenderTargetBitmap((int)Math.Ceiling(area.ActualWidth * dpi.DpiScaleX), (int)Math.Ceiling(area.ActualHeight * dpi.DpiScaleY), dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
                         bitmap.Render(area); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
                         using var stream = File.Create(Path.Combine(output, label + ".png")); encoder.Save(stream);
                     }
-                window.Width = 940; window.Height = 680; window.SummaryExpander.IsExpanded = false;
+                window.Width = 940; window.Height = 680;
                 await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); window.UpdateLayout();
-                Check(window.Metrics.Visibility == Visibility.Visible && window.ScopeNoticeCard.Visibility == Visibility.Visible, "Collapsing summary restores metrics and warning band on short windows");
+                var viewer = (ScrollViewer)window.ResultsGrid.Template.FindName("DG_ScrollViewer", window.ResultsGrid);
+                viewer.ScrollToTop();
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                var bar = Descendants<ScrollBar>(viewer).Single(item => item.Orientation == Orientation.Vertical && item.IsVisible);
+                var up = (RepeatButton)bar.Template.FindName("ScrollUp", bar);
+                var down = (RepeatButton)bar.Template.FindName("ScrollDown", bar);
+                Check(up.IsVisible && down.IsVisible, "Both vertical arrow buttons are visible");
+                ((RoutedCommand)down.Command).Execute(null, down);
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                Check(viewer.VerticalOffset > 0 && viewer.VerticalOffset <= window.ResultsGrid.RowHeight, "Down arrow moves a small single step");
+                ((RoutedCommand)up.Command).Execute(null, up);
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                Check(viewer.VerticalOffset == 0, "Up arrow returns one step");
+                for (int i = 0; i < 4; i++)
+                    window.ResultsGrid.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice, Environment.TickCount, -30) { RoutedEvent = Mouse.PreviewMouseWheelEvent });
+                await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                // Claude 1.21.1: the step follows Windows' lines-per-notch setting (3 lines = 24 px).
+                double notch = SystemParameters.WheelScrollLines < 0 ? viewer.ViewportHeight : 8d * SystemParameters.WheelScrollLines;
+                Check(Math.Abs(viewer.VerticalOffset - Math.Min(notch, viewer.ScrollableHeight)) < 1,
+                    $"Four small wheel events accumulate to one notch ({notch:N0} px for {SystemParameters.WheelScrollLines} lines)");
                 await window.NavigateAsync(WorkspaceView.Settings); await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-                Check(window.SummaryCard.Visibility == Visibility.Collapsed, "Summary does not consume settings space");
+                Check(!window.ScopeNoticeCard.IsVisible, "Scope warning stays out of settings");
                 await window.NavigateAsync(WorkspaceView.Issues); await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-                Check(window.SummaryCard.Visibility == Visibility.Visible, "Summary remains available with warnings");
+                Check(window.ScopeNoticeCard.IsVisible, "Warning remains available in issues");
                 fake.Outcome.Scan.Cancelled = true; await model.ScanAsync(); await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-                Check(((TextBlock)window.SummaryExpander.Header).Text.Contains("Durduruldu"), "Cancelled status reaches rendered header");
+                Check(window.ScopeNoticeText.Text.Contains("Durduruldu"), "Cancelled status reaches the scope warning");
                 PresentationTraceSources.DataBindingSource.Flush(); Check(errors.ToString().Length == 0, "No WPF binding errors");
                 log.Add($"ALL CHECKS PASSED ({log.Count})"); Console.WriteLine(log[^1]); File.WriteAllLines(Path.Combine(output, "results.txt"), log); app.Shutdown(0);
             }
@@ -83,8 +115,11 @@ internal static class UiTests
         static ScanOutcome Example()
         {
             var root = new FolderEntry(@"C:\example", null) { LogicalBytes = 1024, AllocatedBytes = 8192, FileCount = 2 };
-            root.Children.Add(new(@"C:\example\first", root) { LogicalBytes = 512, AllocatedBytes = 4096, FileCount = 1 });
-            root.Children.Add(new(@"C:\example\second", root) { LogicalBytes = 512, AllocatedBytes = 4096, FileCount = 1 });
+            root.Children.Add(new(@"C:\example\unknown", root) { Measurement = MeasurementState.Unknown, LogicalBytes = 2000, AllocatedBytes = 8000 });
+            root.Children.Add(new(@"C:\example\zero", root));
+            root.Children.Add(new(@"C:\example\largest", root) { LogicalBytes = 1024, AllocatedBytes = 4096, FileCount = 1 });
+            for (int i = 0; i < 100; i++)
+                root.Children.Add(new($@"C:\example\folder-{i:D3}", root) { LogicalBytes = i + 1, AllocatedBytes = 512, FileCount = 1 });
             return new(new(root) { Folders = 3, Elapsed = TimeSpan.FromSeconds(10), Timings = new(TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(2)), IssueCount = 1, UnknownAllocation = 1 }, []);
         }
         public string[] NormalizeRoots(IEnumerable<string> paths) => paths.ToArray();

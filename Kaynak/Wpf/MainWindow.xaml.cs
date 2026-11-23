@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using YerelDisk.Presentation;
 
@@ -18,7 +19,11 @@ public partial class MainWindow : Window
     Task exportTask = Task.CompletedTask;
     internal Task PendingView { get; private set; } = Task.CompletedTask;
     int navigationVersion;
+    double pendingWheelDistance;
+    bool wheelQueued;
     object? lastSelection;
+    ReferenceLibrary? referenceLibrary;
+    readonly Lazy<ScanProfiles> scanProfiles = new(ScanProfiles.LoadDefault);
     public MainWindow() : this(new WorkspaceViewModel()) { }
     internal MainWindow(WorkspaceViewModel model)
     {
@@ -44,6 +49,11 @@ public partial class MainWindow : Window
     }
     internal async Task NavigateAsync(WorkspaceView view)
     {
+        if (Model.IsRemeasuring)
+        {
+            (Model.View switch { WorkspaceView.Folders => FoldersNav, WorkspaceView.Files => FilesNav, WorkspaceView.Review => ReviewNav, WorkspaceView.Issues => IssuesNav, _ => SettingsNav }).IsChecked = true;
+            return;
+        }
         int version = ++navigationVersion;
         Task transition = Model.SetViewAsync(view);
         (view switch { WorkspaceView.Folders => FoldersNav, WorkspaceView.Files => FilesNav, WorkspaceView.Review => ReviewNav, WorkspaceView.Issues => IssuesNav, _ => SettingsNav }).IsChecked = true;
@@ -55,9 +65,8 @@ public partial class MainWindow : Window
     internal void ConfigureColumns()
     {
         ResultsGrid.Columns.Clear();
-        ResultsGrid.RowHeight = Model.IsReview ? double.NaN : 42;
+        ResultsGrid.RowHeight = Model.IsReview ? double.NaN : 38;
         ResultsGrid.MinRowHeight = Model.IsReview ? 80 : 0;
-        VirtualizingPanel.SetScrollUnit(ResultsGrid, Model.IsReview ? ScrollUnit.Pixel : ScrollUnit.Item);
         void AddReview(string title, string key, string template, double minimum, double stars = 0)
         {
             var column = new DataGridTemplateColumn
@@ -70,12 +79,14 @@ public partial class MainWindow : Window
         }
         void Add(string title, string key, double width, bool fill = false)
         {
+            bool showTime = key == "Measurement" && Model.HasMixedMeasurements;
+            IValueConverter converter = showTime ? new MeasurementCellConverter(Model) : new CellTextConverter();
             var textStyle = new Style(typeof(TextBlock));
             textStyle.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
-            textStyle.Setters.Add(new Setter(FrameworkElement.ToolTipProperty, new Binding(".") { Converter = new CellTextConverter(), ConverterParameter = key }));
+            textStyle.Setters.Add(new Setter(FrameworkElement.ToolTipProperty, new Binding(".") { Converter = converter, ConverterParameter = showTime ? "Full" : key }));
             DataGridColumn column = Model.View == WorkspaceView.Folders && key == "Name"
                 ? new DataGridTemplateColumn { CellTemplate = (DataTemplate)FindResource("FolderNameTemplate") }
-                : new DataGridTextColumn { Binding = new Binding(".") { Converter = new CellTextConverter(), ConverterParameter = key }, ElementStyle = textStyle };
+                : new DataGridTextColumn { Binding = new Binding(".") { Converter = converter, ConverterParameter = key }, ElementStyle = textStyle };
             column.Header = title; column.SortMemberPath = key;
             column.Width = fill ? new DataGridLength(1, DataGridLengthUnitType.Star) : new DataGridLength(width);
             column.MinWidth = fill ? width : 70;
@@ -117,7 +128,7 @@ public partial class MainWindow : Window
 
     void ChooseRoots(object sender, RoutedEventArgs e)
     {
-        var dialog = new RootsWindow(Model.Roots, Model.NormalizeRoots, Model.Exclusions) { Owner = this };
+        var dialog = new RootsWindow(Model.Roots, Model.NormalizeRoots, Model.Exclusions, () => scanProfiles.Value) { Owner = this };
         if (dialog.ShowDialog() != true) return;
         Model.Roots.Clear();
         foreach (string path in dialog.Paths) Model.Roots.Add(path);
@@ -132,6 +143,14 @@ public partial class MainWindow : Window
         if (Model.View == WorkspaceView.Folders) FoldersNav.IsChecked = true;
     }
     async void ShowTable(object sender, RoutedEventArgs e) => await Model.SetDistributionModeAsync(false);
+    async void Remeasure(object sender, RoutedEventArgs e)
+    {
+        if (Model.IsSettings) await NavigateAsync(WorkspaceView.Folders);
+        await Model.RemeasureAsync(); ConfigureColumns();
+        if (Model.View == WorkspaceView.Folders) FoldersNav.IsChecked = true;
+    }
+    async void RefreshSelected(object sender, RoutedEventArgs e)
+    { await Model.RefreshSelectedAsync(); ConfigureColumns(); }
     async void ShowDistribution(object sender, RoutedEventArgs e) => await Model.SetDistributionModeAsync(true);
     void StopScan(object sender, RoutedEventArgs e) => Model.CancelScan();
     async void GoUp(object sender, RoutedEventArgs e) => await Model.GoUpAsync();
@@ -145,7 +164,7 @@ public partial class MainWindow : Window
     }
     async void ReviewFilterChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!initialized || Model.IsPublishingState || !Model.IsReview) return;
+        if (!initialized || Model.IsPublishingState || Model.IsRemeasuring || !Model.IsReview) return;
         if (ReviewMinimumSelector.SelectedValue is int minimum) Model.ReviewMinimum = minimum;
         if (ReviewKindSelector.SelectedValue is int kind) Model.ReviewKindFilter = kind;
         PendingView = Model.RefreshAsync(); await PendingView;
@@ -165,6 +184,30 @@ public partial class MainWindow : Window
         e.Handled = true;
         await Model.SortAsync(e.Column.SortMemberPath);
         foreach (var column in ResultsGrid.Columns) column.SortDirection = column.SortMemberPath == Model.SortKey ? Model.SortDescending ? ListSortDirection.Descending : ListSortDirection.Ascending : null;
+    }
+    void ScrollResults(object sender, MouseWheelEventArgs e)
+    {
+        if (Keyboard.Modifiers != ModifierKeys.None || e.Delta == 0
+            || ResultsGrid.Template.FindName("DG_ScrollViewer", ResultsGrid) is not ScrollViewer { ScrollableHeight: > 0 } viewer)
+            return;
+
+        // Keep fractional touchpad deltas and combine bursts before applying the offset.
+        // Claude 1.21.1: follow Windows' "lines per notch" setting (Settings > Mouse). The default
+        // three lines keeps the tuned 24 px step; page mode (-1) moves one viewport per notch.
+        int lines = SystemParameters.WheelScrollLines;
+        double perNotch = lines < 0 ? viewer.ViewportHeight : 8d * lines;
+        pendingWheelDistance -= e.Delta * (perNotch / Mouse.MouseWheelDeltaForOneLine);
+        e.Handled = true;
+        if (wheelQueued) return;
+        wheelQueued = true;
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        {
+            wheelQueued = false;
+            double distance = pendingWheelDistance;
+            pendingWheelDistance = 0;
+            if (viewer.IsVisible)
+                viewer.ScrollToVerticalOffset(Math.Clamp(viewer.VerticalOffset + distance, 0, viewer.ScrollableHeight));
+        }));
     }
     async void ResultDoubleClick(object sender, MouseButtonEventArgs e)
     {
@@ -197,6 +240,13 @@ public partial class MainWindow : Window
         CreateDetailsWindow().ShowDialog();
     }
     internal DetailsWindow CreateDetailsWindow() => new(Model.Details) { Owner = this };
+    void ShowPopulation(object sender, RoutedEventArgs e)
+    {
+        if (Model.CanAnalyzePopulation) CreatePopulationWindow()?.ShowDialog();
+    }
+    internal PopulationWindow? CreatePopulationWindow()
+        => Model.CanAnalyzePopulation && Model.Scan is { } scan && Model.PopulationTarget is { } target
+            ? new(scan, target) { Owner = this } : null;
     void ModelChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is null or nameof(WorkspaceViewModel.IsDistribution)) FitWorkspace();
@@ -218,9 +268,32 @@ public partial class MainWindow : Window
         finally { exporting = false; }
     }
 
+    async void ShowComparison(object sender, RoutedEventArgs e)
+    {
+        if (Model.CanCompareMeasurements && Model.Scan is { } scan)
+        {
+            var dialog = new ComparisonWindow(scan, Model.MeasurementCompletedAt, referenceLibrary ??= ReferenceLibrary.LoadDefault()) { Owner = this };
+            dialog.ShowDialog();
+            if (dialog.InspectionPath is { } path)
+            {
+                PendingView = InspectComparisonFolderAsync(scan, path);
+                await PendingView;
+            }
+        }
+    }
+
+    internal async Task InspectComparisonFolderAsync(ScanResult expectedScan, string path)
+    {
+        if (!await Model.InspectComparisonFolderAsync(expectedScan, path)) return;
+        ++navigationVersion;
+        FoldersNav.IsChecked = true;
+        ConfigureColumns(); FitWorkspace();
+        ResultsGrid.Focus();
+    }
+
     void ToggleTheme(object sender, RoutedEventArgs e) => SetTheme(!dark);
-    async void InspectInventory(object sender, RoutedEventArgs e) => await Model.Inventory.InspectAsync();
-    void ForgetInventory(object sender, RoutedEventArgs e) => Model.Inventory.Forget();
+    async void InspectInventory(object sender, RoutedEventArgs e) { if (!Model.IsRemeasuring) await Model.Inventory.InspectAsync(); }
+    void ForgetInventory(object sender, RoutedEventArgs e) { if (!Model.IsRemeasuring) Model.Inventory.Forget(); }
     internal void SetTheme(bool useDark)
     {
         dark = useDark;
@@ -230,8 +303,9 @@ public partial class MainWindow : Window
     }
     async void ResetSettings(object sender, RoutedEventArgs e)
     {
+        if (Model.IsRemeasuring) return;
         Model.Inventory.Forget();
-        Model.Workers = 0; Model.FileLimit = 100_000; Model.FullFolderPath = false; Model.TechnicalColumns = false; SetTheme(false); ConfigureColumns(); await Model.RefreshAsync();
+        Model.Workers = 0; Model.FileLimit = 100_000; Model.RefreshCacheMiB = 0; Model.FullFolderPath = false; Model.TechnicalColumns = false; SetTheme(false); ConfigureColumns(); await Model.RefreshAsync();
     }
     void WindowSizeChanged(object sender, SizeChangedEventArgs e) { if (initialized) FitWorkspace(); }
     void FitWorkspace()
@@ -247,21 +321,18 @@ public partial class MainWindow : Window
         bool compact = ActualHeight < 790;
         bool compactReview = compact && Model.IsReview;
         ResultsPathRow.Visibility = compactReview ? Visibility.Collapsed : Visibility.Visible;
-        ScopeNoticeCard.Tag = compactReview;
+        ScopeNoticeCard.Tag = compact && (Model.IsReview || Model.HasMixedMeasurements);
         PageHeader.Tag = compact;
         bool compactChart = compact && Model.IsDistribution || compactReview;
-        ScopeCard.Padding = compactReview ? new Thickness(14, 4, 14, 4) : compactChart ? new Thickness(14, 8, 14, 8) : new Thickness(18, 15, 18, 15);
-        ScopeCard.Margin = new Thickness(0, 0, 0, compactChart ? 10 : 16);
-        // Expanded summary already contains the totals. Avoid duplicate cards on short windows.
-        Metrics.Tag = compact;
-        SummaryScroll.MaxHeight = compact ? 64 : 140;
-        Metrics.Margin = new Thickness(0, 0, 0, compact ? 10 : 18);
-        PageHeader.Margin = new Thickness(0, 0, 0, compact ? 12 : 20);
+        ScopeCard.Padding = compactReview ? new Thickness(14, 4, 14, 4) : compactChart ? new Thickness(14, 7, 14, 7) : new Thickness(16, 12, 16, 12);
+        ScopeCard.Margin = new Thickness(0, 0, 0, compactChart ? 8 : 12);
+        Metrics.Margin = new Thickness(0, 0, 0, compact ? 8 : 14);
+        PageHeader.Margin = new Thickness(0, 0, 0, compact ? 10 : 16);
         foreach (Border card in Metrics.Children.OfType<Border>())
         {
-            card.Padding = compact ? new Thickness(14, 10, 14, 10) : new Thickness(18, 15, 18, 15);
+            card.Padding = compact ? new Thickness(14, 8, 14, 8) : new Thickness(16, 12, 16, 12);
             var labels = ((StackPanel)card.Child).Children.OfType<TextBlock>().ToArray();
-            labels[1].FontSize = compact ? 23 : 28;
+            labels[1].FontSize = compact ? 22 : 26;
             labels[2].Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         }
     }

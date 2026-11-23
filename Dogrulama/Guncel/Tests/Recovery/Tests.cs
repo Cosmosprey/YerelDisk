@@ -247,7 +247,11 @@ static class RecoveryTests
         result.Files.Add(new(@"C:\good\large.bin", 9000, 12288, DateTime.MinValue, false, ""));
         using var model = new WorkspaceViewModel(new FakeService(new(result, []))); model.Roots.Add(@"C:\fake"); await model.ScanAsync();
         Check(RowValues.Text(bad, "Size") == "Boyut bilinmiyor" && RowValues.Text(bad, "Count") == "Bilinmiyor" && RowValues.AllocatedOf(bad) == null, "Unknown folder has no fake zero size/count/allocation");
-        Check(ReferenceEquals(model.Rows[0], bad), "Unknown folder is prominent in default descending size view");
+        // Claude 1.21.1: since 1.20.2 unmeasured sizes stay last in both directions (DEGISIKLIKLER);
+        // the scope warning band is what keeps the unknown folder visible. This Native check still
+        // expected the pre-1.20.2 order because only Normal suites ran for 1.20.2–1.21.0.
+        Check(ReferenceEquals(model.Rows[^1], bad) && ReferenceEquals(model.Rows[0], good) && model.ShowScopeNotice
+            && model.ScopeNotice.Contains("1 doğrulanamayan konum"), "Unknown folder stays last while the scope warning reports it");
         using (var writer = new StringWriter())
         {
             ReportSnapshot.Capture(model).Write(writer);
@@ -255,7 +259,7 @@ static class RecoveryTests
         }
         await model.SetViewAsync(WorkspaceView.Files); model.SelectedRow = model.Rows[0];
         Check(model.CanUseSelection && model.Details.Path == @"C:\good\large.bin", "Healthy-root selection stays usable beside a changed root");
-        Check(model.ShowScopeNotice && model.ScanActionLabel == "Yeniden doğrula", "Unverified scope exposes warning and manual revalidation action");
+        Check(model.ShowScopeNotice && model.ScanActionLabel == "Yeni tam tarama" && model.ScanActionHint.Contains("yalnız doğrulama yapmaz"), "Unverified scope keeps its warning without disguising a full scan as verification");
         var safety = new ScanResult(new FolderEntry(@"C:\data", null)); safety.UnverifiedPaths.Add(@"C:\data");
         Check(!safety.CanUsePath(@"C:\data\x") && safety.CanUsePath(@"C:\data10\x"), "Unsafe path matching respects component boundaries");
         safety.UnverifiedPaths.Clear(); safety.UnverifiedPaths.Add(@"C:\");

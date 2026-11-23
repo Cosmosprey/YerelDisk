@@ -1,0 +1,70 @@
+<Window x:Class="YerelDisk.Wpf.ComparisonWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="YerelDisk · Tarama farkı" Width="1050" Height="680" MinWidth="670" MinHeight="500"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource Canvas}" Foreground="{DynamicResource Ink}"
+        FontFamily="Segoe UI" FontSize="13" Closing="WindowClosing">
+  <Grid Margin="16">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+    <StackPanel>
+      <TextBlock Text="Tarama farkı" FontSize="24" FontWeight="SemiBold" />
+      <TextBlock Text="Aynı konumlarda iki ölçümü karşılaştırıp en çok değişen klasörleri bulun."
+                 Style="{StaticResource MutedText}" Margin="0,4,0,0" />
+    </StackPanel>
+    <Border Grid.Row="1" Style="{StaticResource Card}" Padding="10" Margin="0,9,0,6">
+      <StackPanel>
+        <WrapPanel x:Name="FileActions" Margin="0,0,0,6">
+          <Button Content="Bu ölçümü referans olarak kaydet" Click="SaveReference" Margin="0,0,8,4" />
+          <Button Content="Referans aç ve karşılaştır" Click="OpenReference" Style="{StaticResource Primary}" Margin="0,0,0,4" />
+          <Button Content="Son referanslar…" Click="ShowLibrary" Margin="6,0,0,4" />
+        </WrapPanel>
+        <TextBlock x:Name="Dates" TextWrapping="Wrap" />
+        <TextBlock Text="Referans dosyası klasör yollarını, kapsamı ve boyut toplamlarını içerir. Yalnızca seçtiğiniz yerel konuma yazılır."
+                   Style="{StaticResource MutedText}" FontSize="11" Margin="0,4,0,0" />
+      </StackPanel>
+    </Border>
+    <TextBlock Grid.Row="2" x:Name="Feedback" TextWrapping="Wrap" MaxHeight="48" Margin="0,0,0,6"
+               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+    <StackPanel Grid.Row="3" x:Name="Navigation" Visibility="Collapsed" Margin="0,0,0,8">
+      <WrapPanel>
+        <Button Content="En büyük farklar" Click="ShowLargest" Margin="0,0,8,4" />
+        <Button x:Name="RootsButton" Content="Seçili kökler" Click="ShowRoots" Margin="0,0,8,4" />
+        <Button x:Name="UpButton" Content="Üst klasör" Click="GoUp" Margin="0,0,8,4" />
+        <Button x:Name="EnterButton" Content="Alt klasörleri göster" Click="EnterSelected" Margin="0,0,0,4" />
+      </WrapPanel>
+      <TextBlock x:Name="Location" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+    </StackPanel>
+    <DataGrid Grid.Row="4" x:Name="Changes" Visibility="Collapsed" AutoGenerateColumns="False"
+              IsReadOnly="True" SelectionMode="Single" CanUserSortColumns="False" RowHeight="34" ColumnHeaderHeight="36"
+              MouseDoubleClick="RowDoubleClick" PreviewKeyDown="GridKeyDown" SelectionChanged="SelectionChanged"
+              AutomationProperties.Name="Klasör boyutu farkları">
+      <DataGrid.Columns>
+        <DataGridTextColumn Header="Klasör yolu" Binding="{Binding Path}" Width="*" MinWidth="155">
+          <DataGridTextColumn.ElementStyle>
+            <Style TargetType="TextBlock">
+              <Setter Property="VerticalAlignment" Value="Center" />
+              <Setter Property="Margin" Value="6,0" />
+              <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+              <Setter Property="ToolTip" Value="{Binding Path}" />
+            </Style>
+          </DataGridTextColumn.ElementStyle>
+        </DataGridTextColumn>
+        <DataGridTextColumn Header="Önceki" Binding="{Binding BeforeText}" Width="100" />
+        <DataGridTextColumn Header="Son ölçüm" Binding="{Binding AfterText}" Width="100" />
+        <DataGridTextColumn Header="Fark" Binding="{Binding DifferenceText}" Width="145" />
+      </DataGrid.Columns>
+    </DataGrid>
+    <DockPanel Grid.Row="5" Margin="0,10,0,0">
+      <Button Content="Kapat" IsCancel="True" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="12,0,0,0" />
+      <Button x:Name="InspectButton" Content="Bu klasörü incele" Click="InspectSelected" IsEnabled="False"
+              DockPanel.Dock="Right" VerticalAlignment="Center" Margin="12,0,0,0"
+              ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="Seçili farkın klasörünü ana taramada incele" />
+      <TextBlock x:Name="InspectionHint" Text="Ana listede incelemek için bir fark satırı seçin. Üst ve alt klasörler örtüşebilir; satırları toplamayın."
+                 Style="{StaticResource MutedText}" FontSize="11" VerticalAlignment="Center"
+                 ToolTip="Fark, ölçülen dosya boyutlarının değişimidir. Üst ve alt klasörler örtüşebilir; satırları toplamayın. Diskin boş alanı farklı değişebilir." />
+    </DockPanel>
+  </Grid>
+</Window>

@@ -8,9 +8,10 @@ try
     {
         string root=Path.Combine(fixtures,$"case-{workers}-{limit}"),a=Path.Combine(root,"a"),b=Path.Combine(root,"b");Directory.CreateDirectory(a);Directory.CreateDirectory(b);
         File.WriteAllBytes(Path.Combine(a,"moves.bin"),new byte[9000]);File.WriteAllBytes(Path.Combine(a,"winner.bin"),new byte[8000]);File.WriteAllBytes(Path.Combine(a,"runner-up.bin"),new byte[7000]);File.WriteAllBytes(Path.Combine(b,"small.bin"),new byte[200]);bool moved=false;
-        var result=VerifiedScan.Scan([a,b],new Forward(p=>{if(!moved&&p.Current=="Doğrulama: "+b){moved=true;File.Move(Path.Combine(a,"moves.bin"),Path.Combine(b,"moves.bin"));File.WriteAllBytes(Path.Combine(b,"moves.bin"),new byte[100]);}}),CancellationToken.None,limit,workers);
+        var result=VerifiedScan.Scan([a,b],new Forward(p=>{if(!moved&&p.Current=="Doğrulama: "+b){moved=true;File.Move(Path.Combine(a,"moves.bin"),Path.Combine(b,"moves.bin"));File.WriteAllBytes(Path.Combine(b,"moves.bin"),new byte[100]);}}),CancellationToken.None,limit,workers,refreshIndexBudgetBytes:4L<<20);
         Check(moved&&result.Files.Select(f=>f.Name).SequenceEqual(new[]{"winner.bin","runner-up.bin"}.Take(limit)), $"Move+shrink refills source candidates: workers={workers}, K={limit}");
         Check(result.Root.LogicalBytes==15300&&result.Root.FileCount==4,$"Move+shrink totals remain exact: {workers}/{limit}");
+        Check(result.RefreshIndex is { Captured:true, FileCount:4 },$"Cross-root move preserves consistent, explicitly uncertain index metadata: {workers}/{limit}");
         Check(result.Files.All(f=>!f.HardLinked)&&!result.CanUsePath(Path.Combine(a,"moves.bin")),$"Stale moved name is blocked without false hard-link labels: {workers}/{limit}");
     }
     string single=Path.Combine(fixtures,"single");Directory.CreateDirectory(single);File.WriteAllBytes(Path.Combine(single,"file.bin"),new byte[3]);

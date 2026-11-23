@@ -19,6 +19,12 @@ internal sealed record ReportSnapshot(string[][] Metadata, object[] Items, Works
             ["Tarama kapsamı", model.ScopeText],
             ["Ölçüm sınırı", ReviewText.Limits]
         ];
+        if (scan.HasMixedMeasurementTimes)
+        {
+            metadata.Add(["Ölçüm zamanı niteliği", MeasurementProvenance.Summary(scan, model.MeasurementCompletedAt)]);
+            metadata.Add(["Önceki tam kapsam ölçümü (UTC)", model.MeasurementCompletedAt.ToString("O", CultureInfo.InvariantCulture)]);
+            foreach (var area in scan.RefreshedAreas) metadata.Add(["Yenilenen alan", area.Path, "Ölçüm zamanı (UTC)", area.MeasuredAt.ToString("O", CultureInfo.InvariantCulture)]);
+        }
         if (scan.Timings is { } phases)
             metadata.Add(["İlk tarama (saniye)", phases.InitialScan.TotalSeconds.ToString("F2", CultureInfo.InvariantCulture),
                 "Doğrulama (saniye)", phases.Verification.TotalSeconds.ToString("F2", CultureInfo.InvariantCulture),

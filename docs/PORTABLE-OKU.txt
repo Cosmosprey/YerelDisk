@@ -1,36 +1,43 @@
-YerelDisk 1.18.0 — Windows x64 portable package
+YerelDisk 1.29.4 — Windows x64 portable package
 
 1. Extract the entire ZIP to a folder.
 2. Open YerelDisk.exe.
-3. Choose the folders to scan and start the scan.
+3. Choose folders and start a scan. The interface is in Turkish.
 
-The package includes the .NET runtime. You can run it without the SDK,
-Visual Studio, or a separate .NET installation. Keep the DLLs beside the EXE.
-The app runs with standard user permissions. The initial release targets
-Windows 11 x64. Windows may display an unknown publisher warning because the
-app is unsigned. You can leave your security software enabled.
+The package includes Microsoft .NET 10.0.15. No SDK, Visual Studio, PowerShell
+command, or separate runtime installation is required. Keep all extracted
+files together. Windows 11 x64 is the verified target; the app is unsigned.
+Windows may show an unknown-publisher warning. Keep security software enabled.
 
-F6 opens details. Opening a location shows it in Explorer. The app does not
-delete or move files. Review candidates provide experimental clues. Whether
-data is in use or safe to delete remains unverified. The app does not treat
-large or old data as unnecessary.
+F6 opens details. CSV and reference files are saved only on request. The app
+has no cleanup commands that delete, move, or change scanned files. Experimental
+review clues cannot establish that data is unused or safe to delete.
 
-The app has no networking, telemetry, or automatic updates. Normal scans
-inspect file system metadata without reading file contents. CSV export and
-clipboard actions require a user request. Application records are optional.
-The Settings button reads application names, publishers, versions, and
-installation paths locally from the 32-bit and 64-bit HKLM/HKCU Uninstall
-sources. Records outside the selected scan roots may be inspected. CSV
-inclusion is a separate option that starts off. Copying the full F6 details
-includes the visible clues for the selection.
+New full scan starts over with the configured locations. Remeasure all uses
+the current result's original scope and keeps it visible until replacement.
+Folder refresh targets the selected folder, or the open folder without a
+selection. At the root it measures the whole scope. The optional 64/128 MiB
+in-memory index starts off; it is not a total RAM cap. A full-scope fallback
+reports its reason. Mixed-time results identify older and refreshed areas.
 
-To remove the app, close it and delete the extracted folder. CSV files and
-clipboard copies you saved remain separate. Windows and .NET manage their own
-system records separately.
+The app has no networking, telemetry, accounts, or automatic updates. Normal
+scans inspect metadata without reading file contents. Opening a saved reference
+reads that selected measurement file. References contain folder paths, sizes,
+timestamps, scope and volume identifiers; compression is not encryption.
+Optional application record inspection reads limited local HKLM/HKCU Uninstall
+values only on request. Including record clues in CSV is a separate opt-in.
 
-Find the source, usage and measurement limits, and new releases at
-https://github.com/Cosmosprey/YerelDisk
+Profiles and reference preferences are session-only unless Remember is enabled.
+That choice stores local JSON files under LocalApplicationData:
+YerelDisk-profiller.json and YerelDisk-referanslar.json. Later relevant dialogs
+can reload them. Turning Remember off removes the corresponding preference
+file; saved references and CSV files remain separate. Removing a recent entry
+does not delete its reference file. No automatic reference-file deletion occurs.
 
-See LICENSE-YerelDisk.txt for the app license. The distributed .NET components
-have their own licenses and third-party notices under Lisanslar. The SHA256
-checksum checks integrity and provides no digital signature.
+To remove the app, turn off any Remember options if you want to clear those
+preferences, close the app, and delete the extracted folder. References, CSV,
+clipboard copies and operating-system records remain separate.
+
+Source and measurement limits: https://github.com/Cosmosprey/YerelDisk
+Keep LICENSE-YerelDisk.txt and the Lisanslar folder containing .NET licenses
+and notices. SHA256 checks integrity; it does not provide a publisher signature.

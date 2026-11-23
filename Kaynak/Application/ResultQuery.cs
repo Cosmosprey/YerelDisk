@@ -56,6 +56,15 @@ internal static class ResultQuery
         rows.Sort((a, b) =>
         {
             if ((++comparisons & 2047) == 0) token.ThrowIfCancellationRequested();
+            // Missing measurements stay below real values in either sort direction.
+            int missing = query.SortKey switch
+            {
+                "Size" => (a is FolderEntry { Measurement: MeasurementState.Unknown })
+                    .CompareTo(b is FolderEntry { Measurement: MeasurementState.Unknown }),
+                "Allocated" => (RowValues.AllocatedOf(a) == null).CompareTo(RowValues.AllocatedOf(b) == null),
+                _ => 0
+            };
+            if (missing != 0) return missing;
             return query.Descending ? RowValues.Compare(b, a, query.SortKey) : RowValues.Compare(a, b, query.SortKey);
         });
         token.ThrowIfCancellationRequested();

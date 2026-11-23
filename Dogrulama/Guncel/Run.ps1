@@ -1,10 +1,11 @@
 ﻿[CmdletBinding()]
-param([switch]$Native, [switch]$All, [switch]$List, [string]$PublishedProductDirectory)
+param([switch]$Native, [switch]$All, [switch]$List, [switch]$KeepFixtures, [string]$PublishedProductDirectory)
 $ErrorActionPreference = 'Stop'
 $catalog = @((Import-PowerShellDataFile -LiteralPath (Join-Path $PSScriptRoot 'Suites.psd1')).Suites | ForEach-Object { [pscustomobject]$_ })
 if ($Native -and $All) { throw '-Native ve -All birlikte kullanılmaz.' }
 $selected = @($catalog | Where-Object { $All -or ($Native -and $_.Group -eq 'Native') -or (!$Native -and !$All -and $_.Group -eq 'Normal') })
 if ($List) { $selected | Select-Object Name,Group,MinimumPass,@{Name='Capabilities';Expression={$_.Capabilities -join ', '}} | Format-Table -AutoSize; return }
+. (Join-Path $PSScriptRoot 'FixtureCleanup.ps1')
 $diskDir = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $runsDir = Join-Path $PSScriptRoot 'Kosular'
 foreach ($directory in @($diskDir, (Join-Path $diskDir 'Dogrulama'), $PSScriptRoot, $runsDir)) {
@@ -18,8 +19,8 @@ $productDir = if ($PublishedProductDirectory) { [IO.Path]::GetFullPath($Publishe
 $rows = [Collections.Generic.List[object]]::new()
 $exitCode = 0
 $capabilities = $null
-$productFiles = @('YerelDisk.exe','YerelDisk.dll','YerelDisk.deps.json','YerelDisk.runtimeconfig.json','YerelDisk.Core.dll','YerelDisk.Application.dll')
-if (!$PublishedProductDirectory) { $productFiles += @('YerelDisk.Core.deps.json','YerelDisk.Application.deps.json') }
+$productFiles = @('YerelDisk.exe','YerelDisk.dll','YerelDisk.deps.json','YerelDisk.runtimeconfig.json','YerelDisk.Core.dll','YerelDisk.Core.deps.json','YerelDisk.Application.dll','YerelDisk.Application.deps.json')
+if ($PublishedProductDirectory) { $productFiles = @('YerelDisk.exe','YerelDisk.dll','YerelDisk.deps.json','YerelDisk.runtimeconfig.json','YerelDisk.Core.dll','YerelDisk.Application.dll') }
 $installedMatch = $false
 function Invoke-Dotnet([string[]]$Arguments, [string]$Log) {
     # Encode argv for CreateProcess, not for a shell. Works on Windows PowerShell 5.1 too.
@@ -55,23 +56,27 @@ function Source-Hashes {
     } | Sort-Object Path)
 }
 try {
+    . (Join-Path $PSScriptRoot 'Mutasyon/Evidence.ps1')
+    & (Join-Path $PSScriptRoot 'Mutasyon/Test-Altyapi.ps1')
+    $testSourceBefore = Get-ValidationHarnessHashes $PSScriptRoot
+    $testSourceBefore | Export-Csv -LiteralPath (Join-Path $runDir 'test-source-SHA256SUMS.csv') -NoTypeInformation -Encoding UTF8
     if (!(Get-Command dotnet -ErrorAction SilentlyContinue)) { throw '.NET 10 SDK gerekli; çalışma zamanı tek başına testleri derleyemez.' }
-    $env:DOTNET_CLI_TELEMETRY_OPTOUT='1'; $env:DOTNET_NOLOGO='1'; $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'; $env:DOTNET_GENERATE_ASPNET_CERTIFICATE='false'
+    $env:DOTNET_CLI_TELEMETRY_OPTOUT='1'; $env:DOTNET_NOLOGO='1'; $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1'
     $env:DOTNET_ADD_GLOBAL_TOOLS_TO_PATH='false'; $env:MSBuildEnableWorkloadResolver='false'
     $env:DOTNET_CLI_HOME=Join-Path $runDir 'build-home'; $env:NUGET_PACKAGES=Join-Path $runDir 'packages'
     $sourceBefore = Source-Hashes
     $sourceBefore | Export-Csv -LiteralPath (Join-Path $runDir 'source-SHA256SUMS.csv') -NoTypeInformation -Encoding UTF8
     Write-Output "Doğrulama: $runDir"
     if ($PublishedProductDirectory) {
-        $publishedSources=@(Import-Csv -LiteralPath (Join-Path $productDir 'SOURCE-SHA256SUMS.csv'))
-        if ($publishedSources.Count -ne $sourceBefore.Count -or (Compare-Object @($sourceBefore | ForEach-Object { $_.Path+':'+$_.SHA256 }) @($publishedSources | ForEach-Object { $_.Path+':'+$_.SHA256 }))) { throw 'Yayımlanan paketin kaynak manifesti mevcut kaynakla eşleşmiyor.' }
-        $runtime=Get-Content -LiteralPath (Join-Path $productDir 'YerelDisk.runtimeconfig.json') -Raw | ConvertFrom-Json
-        if (!$runtime.runtimeOptions.includedFrameworks -or $runtime.runtimeOptions.frameworks -or $runtime.runtimeOptions.framework) { throw 'Self-contained paket bekleniyordu.' }
-        Write-Output 'Kaynak manifesti eşleşen portable paketin DLL dosyaları sınanıyor; paket yeniden derlenmez.'
+        $publishedSources = @(Import-Csv -LiteralPath (Join-Path $productDir 'SOURCE-SHA256SUMS.csv'))
+        if ($publishedSources.Count -ne $sourceBefore.Count -or (Compare-Object @($sourceBefore | ForEach-Object { $_.Path+':'+$_.SHA256 }) @($publishedSources | ForEach-Object { $_.Path+':'+$_.SHA256 }))) { throw 'Published package source manifest does not match the current source.' }
+        $runtime = Get-Content -LiteralPath (Join-Path $productDir 'YerelDisk.runtimeconfig.json') -Raw | ConvertFrom-Json
+        if (!$runtime.runtimeOptions.includedFrameworks -or $runtime.runtimeOptions.frameworks -or $runtime.runtimeOptions.framework) { throw 'Expected a self-contained package.' }
+        Write-Output 'Testing the published package DLLs; the package is not rebuilt.'
     } else {
-        Write-Output 'Güncel kaynak derleniyor; ana uygulama dosyaları değiştirilmez.'
+        Write-Output 'Building the current source into an isolated test directory.'
         $buildExit=Invoke-Dotnet @('build',(Join-Path $diskDir 'Kaynak/Wpf/YerelDisk.Wpf.csproj'),'-c','Release','--configfile',(Join-Path $diskDir 'Kaynak/NuGet.Config'),'-p:NuGetAudit=false','-p:UseSharedCompilation=false','-m:1','-o',$productDir) (Join-Path $runDir 'build-product.txt')
-        if ($buildExit -ne 0) { throw "Ürün derlenemedi: $(Join-Path $runDir 'build-product.txt')" }
+        if ($buildExit -ne 0) { throw "Product build failed: $(Join-Path $runDir 'build-product.txt')" }
     }
     $hashes = foreach ($name in $productFiles) { [pscustomobject]@{Path=$name; SHA256=(Get-FileHash -LiteralPath (Join-Path $productDir $name)).Hash} }
     $hashes | Export-Csv -LiteralPath (Join-Path $runDir 'product-SHA256SUMS.csv') -NoTypeInformation -Encoding UTF8
@@ -82,6 +87,9 @@ try {
         $probeExit=Invoke-Dotnet @((Join-Path $probeBuild 'YerelDisk.Validation.Capabilities.dll'),(Join-Path $runDir 'capability-fixtures'),(Join-Path $runDir 'capabilities.json')) (Join-Path $runDir 'capabilities-console.txt')
         if ($probeExit -ne 0) { throw 'Native ortam kontrolü beklenmedik biçimde başarısız oldu; SKIP sayılmadı.' }
         $capabilities = Get-Content -LiteralPath (Join-Path $runDir 'capabilities.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (@($capabilities.PSObject.Properties | Where-Object { !$_.Value.Available }).Count -eq 0) {
+            Move-ValidationFixturesToRecycleBin $runDir 'Capabilities' 'PASS' -KeepFixtures:$KeepFixtures
+        }
     }
     foreach ($suite in $selected) {
         $unavailable = @($suite.Capabilities | Where-Object {
@@ -120,6 +128,7 @@ try {
             } else {
                 $rows.Add([pscustomobject]@{Suite=$suite.Name; Group=$suite.Group; Status='PASS'; Assertions=$passes; Reason=''})
                 Write-Output "PASS $($suite.Name): $passes kontrol"
+                Move-ValidationFixturesToRecycleBin $runDir $suite.Name 'PASS' -KeepFixtures:$KeepFixtures
             }
         } catch {
             $rows.Add([pscustomobject]@{Suite=$suite.Name; Group=$suite.Group; Status='FAIL'; Assertions=0; Reason=$_.Exception.Message})
@@ -128,6 +137,7 @@ try {
     }
     $sourceAfter = Source-Hashes
     if (Compare-Object ($sourceBefore | ForEach-Object { $_.Path+':'+$_.SHA256 }) ($sourceAfter | ForEach-Object { $_.Path+':'+$_.SHA256 })) { throw 'Test sırasında ürün kaynağı değişti; sonuç tutarlı kaynak sürümü için sayılmaz.' }
+    if (Compare-Object ($testSourceBefore | ForEach-Object { $_.Path+':'+$_.SHA256 }) (Get-ValidationHarnessHashes $PSScriptRoot | ForEach-Object { $_.Path+':'+$_.SHA256 })) { throw 'Test sırasında test kaynağı/destek dosyaları değişti; sonuç geçersiz.' }
 } catch {
     $rows.Add([pscustomobject]@{Suite='Infrastructure'; Group='Runner'; Status='FAIL'; Assertions=0; Reason=$_.Exception.Message})
     $exitCode=1; Write-Output "FAIL altyapı: $($_.Exception.Message)"
@@ -135,7 +145,7 @@ try {
     $summary = [pscustomobject]@{
         Run=$runId; ProductVersion=$(if (Test-Path -LiteralPath (Join-Path $productDir 'YerelDisk.exe')) { (Get-Item -LiteralPath (Join-Path $productDir 'YerelDisk.exe')).VersionInfo.ProductVersion } else { $null })
         InstalledPackageMatches=$installedMatch; ExitCode=$exitCode
-        ProductOrigin=$(if ($PublishedProductDirectory) {'PublishedPackage'} else {'SourceBuild'})
+        FixturePolicy=$(if ($KeepFixtures) { 'KeepAll' } else { 'RecyclePassedOnly' })
         Selected=@($selected.Name); NotSelected=@($catalog.Name | Where-Object { $_ -notin $selected.Name })
         PassedAssertions=[int](($rows | Where-Object Status -eq 'PASS' | Measure-Object -Property Assertions -Sum).Sum)
         Results=$rows.ToArray()

@@ -13,6 +13,7 @@
   <SolidColorBrush x:Key="WarningLine" Color="#EBD6AA" />
   <BooleanToVisibilityConverter x:Key="Visible" />
   <local:CellTextConverter x:Key="Cell" />
+  <local:MeasurementContextConverter x:Key="MeasurementTime" />
   <local:SizeRatioConverter x:Key="SizeRatio" />
   <local:ReviewAttentionConverter x:Key="ReviewAttention" />
   <local:InventoryHintConverter x:Key="InventoryHint" />
@@ -54,7 +55,10 @@
     </Border>
   </DataTemplate>
   <DataTemplate x:Key="ReviewMeasurementTemplate">
-    <TextBlock Text="{Binding Converter={StaticResource Cell}, ConverterParameter=Measurement}" TextWrapping="Wrap" FontSize="11" Margin="0,10" ToolTip="{Binding Converter={StaticResource Cell}, ConverterParameter=Measurement}" />
+    <TextBlock TextWrapping="Wrap" FontSize="11" Margin="0,10">
+      <TextBlock.Text><MultiBinding Converter="{StaticResource MeasurementTime}"><Binding /><Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=DataGrid}" /><Binding Path="DataContext.HasMixedMeasurements" RelativeSource="{RelativeSource AncestorType=DataGrid}" /></MultiBinding></TextBlock.Text>
+      <TextBlock.ToolTip><MultiBinding Converter="{StaticResource MeasurementTime}" ConverterParameter="Full"><Binding /><Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=DataGrid}" /><Binding Path="DataContext.HasMixedMeasurements" RelativeSource="{RelativeSource AncestorType=DataGrid}" /></MultiBinding></TextBlock.ToolTip>
+    </TextBlock>
   </DataTemplate>
   <DataTemplate x:Key="FolderNameTemplate">
     <Grid Margin="0,3"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="3" /></Grid.RowDefinitions>
@@ -120,14 +124,28 @@
       </Grid><ControlTemplate.Triggers><Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource Accent}" /></Trigger><Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45" /></Trigger></ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value></Setter>
   </Style>
+  <Style x:Key="ScrollArrow" TargetType="RepeatButton">
+    <Setter Property="Focusable" Value="False" /><Setter Property="Height" Value="17" />
+    <Setter Property="Delay" Value="350" /><Setter Property="Interval" Value="85" />
+    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RepeatButton">
+      <Border x:Name="ArrowSurface" Background="Transparent"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
+      <ControlTemplate.Triggers>
+        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ArrowSurface" Property="Background" Value="{DynamicResource Selection}" /></Trigger>
+        <Trigger Property="IsPressed" Value="True"><Setter TargetName="ArrowSurface" Property="Opacity" Value="0.65" /></Trigger>
+      </ControlTemplate.Triggers>
+    </ControlTemplate></Setter.Value></Setter>
+  </Style>
   <Style TargetType="ScrollBar">
     <Setter Property="Width" Value="12" /><Setter Property="Background" Value="{DynamicResource Soft}" />
     <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar">
-      <Border Background="{TemplateBinding Background}"><Track x:Name="PART_Track" IsDirectionReversed="True" Orientation="{TemplateBinding Orientation}">
+      <Border Background="{TemplateBinding Background}"><DockPanel>
+        <RepeatButton x:Name="ScrollUp" DockPanel.Dock="Top" Style="{StaticResource ScrollArrow}" Command="{x:Static ScrollBar.LineUpCommand}" AutomationProperties.Name="Bir adım yukarı kaydır"><Path Data="M 0,4 L 4,0 L 8,4 Z" Fill="{DynamicResource Ink}" /></RepeatButton>
+        <RepeatButton x:Name="ScrollDown" DockPanel.Dock="Bottom" Style="{StaticResource ScrollArrow}" Command="{x:Static ScrollBar.LineDownCommand}" AutomationProperties.Name="Bir adım aşağı kaydır"><Path Data="M 0,0 L 4,4 L 8,0 Z" Fill="{DynamicResource Ink}" /></RepeatButton>
+        <Track x:Name="PART_Track" IsDirectionReversed="True" Orientation="{TemplateBinding Orientation}">
         <Track.DecreaseRepeatButton><RepeatButton x:Name="Decrease" Command="{x:Static ScrollBar.PageUpCommand}" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent" /></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
         <Track.Thumb><Thumb x:Name="Handle" Margin="3" MinHeight="18"><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="{DynamicResource Muted}" CornerRadius="3" Opacity="0.45" /></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
         <Track.IncreaseRepeatButton><RepeatButton x:Name="Increase" Command="{x:Static ScrollBar.PageDownCommand}" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent" /></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
-      </Track></Border><ControlTemplate.Triggers><Trigger Property="Orientation" Value="Horizontal"><Setter Property="Width" Value="Auto" /><Setter Property="Height" Value="12" /><Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False" /><Setter TargetName="Decrease" Property="Command" Value="{x:Static ScrollBar.PageLeftCommand}" /><Setter TargetName="Increase" Property="Command" Value="{x:Static ScrollBar.PageRightCommand}" /><Setter TargetName="Handle" Property="MinHeight" Value="0" /><Setter TargetName="Handle" Property="MinWidth" Value="18" /></Trigger></ControlTemplate.Triggers>
+      </Track></DockPanel></Border><ControlTemplate.Triggers><Trigger Property="Orientation" Value="Horizontal"><Setter Property="Width" Value="Auto" /><Setter Property="Height" Value="12" /><Setter TargetName="ScrollUp" Property="Visibility" Value="Collapsed" /><Setter TargetName="ScrollDown" Property="Visibility" Value="Collapsed" /><Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False" /><Setter TargetName="Decrease" Property="Command" Value="{x:Static ScrollBar.PageLeftCommand}" /><Setter TargetName="Increase" Property="Command" Value="{x:Static ScrollBar.PageRightCommand}" /><Setter TargetName="Handle" Property="MinHeight" Value="0" /><Setter TargetName="Handle" Property="MinWidth" Value="18" /></Trigger></ControlTemplate.Triggers>
     </ControlTemplate></Setter.Value></Setter>
   </Style>
   <Style TargetType="CheckBox"><Setter Property="Foreground" Value="{DynamicResource Ink}" /><Setter Property="Margin" Value="0,8,0,8" /><Setter Property="VerticalContentAlignment" Value="Center" /></Style>

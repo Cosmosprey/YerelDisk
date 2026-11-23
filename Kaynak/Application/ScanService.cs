@@ -9,14 +9,17 @@ internal sealed class ScanRequest
     internal IReadOnlyList<string> Exclusions => Array.AsReadOnly(exclusions);
     internal int Workers { get; }
     internal int FileLimit { get; }
-    internal ScanRequest(IEnumerable<string> paths, int workers, int fileLimit, IEnumerable<string>? excludedPaths = null)
+    internal long RefreshIndexBudgetBytes { get; }
+    internal ScanRequest(IEnumerable<string> paths, int workers, int fileLimit, IEnumerable<string>? excludedPaths = null, long refreshIndexBudgetBytes = 0)
     {
+        RefreshIndex.ValidateBudget(refreshIndexBudgetBytes);
         roots = paths.ToArray();
         exclusions = excludedPaths?.ToArray() ?? [];
         if (roots.Length == 0) throw new ArgumentException("Önce klasör seçin.");
         if (workers is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(workers));
         if (fileLimit < 1) throw new ArgumentOutOfRangeException(nameof(fileLimit));
         Workers = workers; FileLimit = fileLimit;
+        RefreshIndexBudgetBytes = refreshIndexBudgetBytes;
     }
 }
 
@@ -39,7 +42,7 @@ internal sealed class NativeScanService : IScanService
         => Task.Run(() =>
         {
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            var result = VerifiedScan.Scan(request.Roots, progress, token, request.FileLimit, request.Workers, request.Exclusions);
+            var result = VerifiedScan.Scan(request.Roots, progress, token, request.FileLimit, request.Workers, request.Exclusions, request.RefreshIndexBudgetBytes);
             var candidates = ReviewRules.ForCurrentUser().Analyze(result);
             result.Elapsed = watch.Elapsed;
             return new ScanOutcome(result, candidates);

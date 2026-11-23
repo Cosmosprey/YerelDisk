@@ -34,8 +34,9 @@ internal sealed record FileEntry(string Path, long Size, long? Allocated, DateTi
 internal sealed record ScanIssue(string Path, string Reason);
 internal enum ScanPhase { InitialScan, Verification, Refresh, Finalizing }
 internal sealed record ScanTimings(TimeSpan InitialScan, TimeSpan Verification, TimeSpan Refresh);
+internal sealed record RefreshAreaMeasurement(string Path, DateTimeOffset MeasuredAt);
 internal sealed record ScanProgress(long Files, long Folders, long Bytes, long Issues, string Current, TimeSpan Elapsed,
-    ScanPhase Phase = ScanPhase.InitialScan);
+    ScanPhase Phase = ScanPhase.InitialScan, RefreshReason? FullRefreshReason = null);
 internal sealed class ScanResult(FolderEntry root)
 {
     public FolderEntry Root { get; } = root;
@@ -55,6 +56,7 @@ internal sealed class ScanResult(FolderEntry root)
     // or a selected root that could not be scanned): the result is partial.
     public bool Failed;
     public List<string> RootPaths { get; } = [root.Path];
+    internal IReadOnlyDictionary<string, Guid>? RootVolumeIds { get; set; }
     public IReadOnlyList<string> ExcludedPaths { get; internal set; } = Array.Empty<string>();
     public HashSet<string> UnverifiedPaths { get; } = new(StringComparer.OrdinalIgnoreCase);
     public List<string> VerificationHistory { get; } = [];
@@ -65,6 +67,10 @@ internal sealed class ScanResult(FolderEntry root)
     internal Dictionary<(uint Volume, ulong Id), LinkAllocation> PhysicalLinks { get; } = [];
     internal IEnumerable<(FolderEntry Owner, FileObservation File)>? FileCandidates;
     internal ObservedFileEvidence? ObservedEvidence;
+    internal RefreshIndex? RefreshIndex;
+    internal IReadOnlyList<RefreshAreaMeasurement> RefreshedAreas { get; set; } = Array.Empty<RefreshAreaMeasurement>();
+    internal bool HasMixedMeasurementTimes => RefreshedAreas.Count > 0;
+    internal IEnumerable<(FolderEntry Owner, RefreshDirectoryData Data)>? RefreshDirectoryCandidates;
     public bool HasUnverified => UnverifiedPaths.Count > 0 || Root.Measurement != MeasurementState.Measured;
     public bool CanUsePath(string? path)
     {
@@ -82,7 +88,7 @@ internal sealed class ScanResult(FolderEntry root)
 
 // Claude 1.9.1: Size and Linked (Links > 1 when observed) tell a real hard link from a stale
 // observation of a file that was moved: one name each time means the earlier name is gone.
-internal sealed record LinkAllocation(FolderEntry Owner, long Bytes, string? Name = null, long Size = 0, bool Linked = true);
+internal sealed record LinkAllocation(FolderEntry Owner, long Bytes, string? Name = null, long Size = 0, bool Linked = true, bool AllocationKnown = true);
 internal sealed record ScanPolicy((uint Volume, ulong Id) RootIdentity);
 
 internal static class DiskScanner

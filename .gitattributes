@@ -8,3 +8,11 @@
 *.md text eol=lf
 *.png binary
 *.zip binary
+# Production manifests hash exact build-input bytes, including mixed line endings.
+# Preserve these bytes on check-in/checkout; keep normal text diff behavior.
+Kaynak/**/*.cs -text !eol whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+Kaynak/**/*.xaml -text !eol whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+Kaynak/**/*.csproj -text !eol whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+Kaynak/**/*.manifest -text !eol whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+Kaynak/**/*.config -text !eol whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+Kaynak/**/*.Config -text !eol whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

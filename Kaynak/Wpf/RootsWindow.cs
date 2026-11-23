@@ -12,20 +12,25 @@ internal sealed class RootsWindow : Window
     internal readonly ListBox ExcludedList = new() { SelectionMode = SelectionMode.Extended };
     internal readonly TextBox PathInput = new() { MinWidth = 120 };
     internal readonly Button IncludedTab = new(), ExcludedTab = new();
+    internal readonly Button ProfilesButton = new() { Content = "Profiller…", Margin = new Thickness(8, 0, 0, 0) };
     internal readonly Button AddPathButton = new() { Content = "Yolu ekle", Margin = new Thickness(8, 0, 0, 0) };
     internal readonly Button RemoveButton = new() { Content = "Seçileni çıkar", Margin = new Thickness(8, 0, 0, 0) };
     internal readonly Button AcceptButton = new() { Content = "Bu kapsamı kullan", HorizontalAlignment = HorizontalAlignment.Right };
     internal readonly TextBlock Note = new() { TextWrapping = TextWrapping.Wrap };
     readonly TextBlock description = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 12) };
     readonly Func<IEnumerable<string>, string[]> normalizeRoots;
+    readonly Func<ScanProfiles> getProfiles;
+    bool profilesLoading, closed;
     bool editingExclusions;
     internal string[] Paths => IncludedList.Items.Cast<string>().ToArray();
     internal string[] Exclusions => ExcludedList.Items.Cast<string>().ToArray();
     ListBox ActiveList => editingExclusions ? ExcludedList : IncludedList;
 
-    internal RootsWindow(IEnumerable<string> roots, Func<IEnumerable<string>, string[]> normalizeRoots, IEnumerable<string>? excluded = null)
+    internal RootsWindow(IEnumerable<string> roots, Func<IEnumerable<string>, string[]> normalizeRoots, IEnumerable<string>? excluded = null, Func<ScanProfiles>? getProfiles = null)
     {
         this.normalizeRoots = normalizeRoots;
+        this.getProfiles = getProfiles ?? (() => new ScanProfiles());
+        Closed += (_, _) => closed = true;
         Title = "Tarama kapsamı"; Width = 760; Height = 600; MinWidth = 540; MinHeight = 480;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         SetResourceReference(BackgroundProperty, "Canvas"); SetResourceReference(ForegroundProperty, "Ink"); FontFamily = new FontFamily("Segoe UI");
@@ -35,7 +40,8 @@ internal sealed class RootsWindow : Window
         var top = new StackPanel(); DockPanel.SetDock(top, Dock.Top); panel.Children.Add(top);
         top.Children.Add(new TextBlock { Text = "Nereyi tarayalım?", FontSize = 23, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14) });
         var tabs = new WrapPanel(); IncludedTab.Margin = new Thickness(0, 0, 8, 0);
-        tabs.Children.Add(IncludedTab); tabs.Children.Add(ExcludedTab); top.Children.Add(tabs); top.Children.Add(description);
+        tabs.Children.Add(IncludedTab); tabs.Children.Add(ExcludedTab); tabs.Children.Add(ProfilesButton); top.Children.Add(tabs); top.Children.Add(description);
+        ProfilesButton.Click += ShowProfiles;
         IncludedTab.Click += (_, _) => SelectExclusions(false); ExcludedTab.Click += (_, _) => SelectExclusions(true);
         var bottom = new StackPanel(); DockPanel.SetDock(bottom, Dock.Bottom); panel.Children.Add(bottom);
         var add = new Button { Content = "Klasör ekle · çoklu seçim" };
@@ -69,7 +75,28 @@ internal sealed class RootsWindow : Window
         description.Text = selected
             ? "Bu yollar ve altları taranmaz. Önce taranacak kökü ekleyin; ardından örneğin C:\\Windows'u hariç tutun. Seçili kökün tamamı hariç tutulamaz."
             : "Birden fazla yerel klasör seçebilirsiniz. Üst klasör altlarını zaten kapsar. İstemediğiniz alt klasörleri Hariç tutulanlar bölümüne ekleyin.";
-        Note.Text = "Bu tercihler yalnız oturumluk. Hariç tutulan yolların varlığı / boyutu ölçülmez; sonuç ve CSV'de kapsam dışında gösterilir. Ağ ve klasör bağlantıları izlenmez.";
+        Note.Text = "Bu kapsam oturumda kullanılır; Profiller'den isteğe bağlı hatırlanabilir. Hariç yolların varlığı / boyutu ölçülmez; sonuç ve CSV'de kapsam dışında gösterilir. Ağ ve klasör bağlantıları izlenmez.";
+    }
+    async void ShowProfiles(object sender, RoutedEventArgs e)
+    {
+        if (profilesLoading) return;
+        profilesLoading = true; ProfilesButton.IsEnabled = false;
+        try
+        {
+            var library = await Task.Run(getProfiles);
+            if (closed) return;
+            var window = new ProfilesWindow(library, Paths, Exclusions) { Owner = this };
+            window.ShowDialog();
+            if (window.SelectedProfile is { } profile) ApplyProfile(profile);
+        }
+        finally { profilesLoading = false; if (!closed) ProfilesButton.IsEnabled = true; }
+    }
+    internal void ApplyProfile(ScanProfile profile)
+    {
+        IncludedList.Items.Clear(); foreach (string path in profile.Roots) IncludedList.Items.Add(path);
+        ExcludedList.Items.Clear(); foreach (string path in profile.Exclusions) ExcludedList.Items.Add(path);
+        SelectExclusions(false);
+        Note.Text = $"{profile.Name} kapsamı yüklendi. Yolları düzenleyebilir ve Bu kapsamı kullan ile onaylayabilirsiniz. Henüz tarama başlamadı; yollar kullanılırken yeniden doğrulanır.";
     }
     void UpdateCounts()
     {

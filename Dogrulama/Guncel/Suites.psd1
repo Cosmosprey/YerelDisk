@@ -1,5 +1,25 @@
 @{
     Suites = @(
+        @{ Name='AccountingOracle'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=84; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='SelectedRefresh'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=48; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='SelectedRefreshUi'; Group='Normal'; Assembly='YerelDisk.Wpf.Tests'; MinimumPass=54; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='RefreshExecution'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=41; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='RefreshExecutionNative'; Group='Native'; Assembly='YerelDisk.Application.Tests'; MinimumPass=20; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@('HardLink','Junction','Streams') }
+        @{ Name='RefreshPlanner'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=51; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='RefreshPlannerNative'; Group='Native'; Assembly='YerelDisk.Application.Tests'; MinimumPass=13; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@('HardLink','Junction') }
+        @{ Name='RefreshIndex'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=40; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='RefreshIndexNative'; Group='Native'; Assembly='YerelDisk.Application.Tests'; MinimumPass=20; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@('HardLink','Junction','Streams') }
+        @{ Name='Remeasure'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=46; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='RemeasureUi'; Group='Normal'; Assembly='YerelDisk.Wpf.Tests'; MinimumPass=39; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='ScanProfiles'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=75; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='ScanProfilesUi'; Group='Normal'; Assembly='YerelDisk.Wpf.Tests'; MinimumPass=34; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='ScanProfilesNative'; Group='Native'; Assembly='YerelDisk.Application.Tests'; MinimumPass=11; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@('Junction','Acl') }
+        @{ Name='Population'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=32; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='PopulationUi'; Group='Normal'; Assembly='YerelDisk.Wpf.Tests'; MinimumPass=22; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='PopulationNative'; Group='Native'; Assembly='YerelDisk.Application.Tests'; MinimumPass=10; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@('HardLink','Junction','Streams') }
+        @{ Name='CompactMeasurements'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=37; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='Comparison'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=63; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='ComparisonUi'; Group='Normal'; Assembly='YerelDisk.Wpf.Tests'; MinimumPass=52; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
         @{ Name='Inventory'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=61; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
         @{ Name='InventoryUi'; Group='Normal'; Assembly='YerelDisk.Wpf.Tests'; MinimumPass=27; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
         @{ Name='Filtering'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=22; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
@@ -22,8 +42,8 @@
         @{ Name='IdentityCapacity'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=10; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
         @{ Name='Review'; Group='Normal'; Assembly='YerelDisk.Application.Tests'; MinimumPass=139; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
         @{ Name='ReviewUi'; Group='Normal'; Assembly='YerelDisk.Wpf.Tests'; MinimumPass=19; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
-        @{ Name='SummaryUi'; Group='Normal'; Assembly='YerelDisk.Wpf.Tests'; MinimumPass=23; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
-        @{ Name='Movement'; Group='Native'; Assembly='YerelDisk.Application.Tests'; MinimumPass=16; ResultKind='Directory'; Success='^RESULT PASS=\d+; Failures=0$'; Capabilities=@('HardLink') }
+        @{ Name='SummaryUi'; Group='Normal'; Assembly='YerelDisk.Wpf.Tests'; MinimumPass=30; ResultKind='Directory'; Success='^ALL CHECKS PASSED \(\d+\)$'; Capabilities=@() }
+        @{ Name='Movement'; Group='Native'; Assembly='YerelDisk.Application.Tests'; MinimumPass=20; ResultKind='Directory'; Success='^RESULT PASS=\d+; Failures=0$'; Capabilities=@('HardLink') }
         @{ Name='Recovery'; Group='Native'; Assembly='YerelDisk.Application.Tests'; MinimumPass=57; ResultKind='Directory'; Success='^RESULT PASS=\d+; Failures=0$'; Capabilities=@('HardLink','Junction','Acl') }
         @{ Name='Regression'; Group='Native'; Assembly='YerelDisk.Native.Regression'; MinimumPass=17; ResultKind='CoreAndLog'; Success='^Failures=0$'; Capabilities=@('HardLink','Junction','Streams') }
         @{ Name='Errors'; Group='Native'; Assembly='YerelDisk.Native.Errors'; MinimumPass=12; ResultKind='CoreLogAndFixtures'; Success='^Failures=0$'; Capabilities=@('Acl') }

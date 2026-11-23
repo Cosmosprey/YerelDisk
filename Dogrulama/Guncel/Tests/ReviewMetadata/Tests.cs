@@ -98,8 +98,8 @@ internal static class MetadataTests
             wide.FileCandidates=wide.Root.Children.Select(owner=>(owner,File("small.pst")));ObservedFileEvidence.Capture([wide]);
             long wideStart=GC.GetAllocatedBytesForCurrentThread();var wideWatch=Stopwatch.StartNew();var wideSummary=ObservedFileEvidence.Capture([wide]);wideWatch.Stop();long wideAllocated=GC.GetAllocatedBytesForCurrentThread()-wideStart;
             Check(wideSummary.Owners.Count==10000&&wideSummary.VisitedNames==10000,"Separate risk owners retain exact sparse folder summaries");
-            Check(wideAllocated<10000L*2048,"Many risk owners avoid empty-uncertainty ancestor allocation explosion");
             log.Add($"MEASURE capture-only 10k risk owners: {wideWatch.Elapsed.TotalMilliseconds:F2} ms, {wideAllocated} managed bytes; canonical path validation included");
+            Check(wideAllocated<10000L*2048,"Many risk owners avoid empty-uncertainty ancestor allocation explosion");
             foreach(bool positive in new[]{false,true})
             {
                 var s=Synthetic(cache);s.FileCandidates=Enumerable.Repeat((s.Root,File(positive?"mail.pst":"file.bin")),500000);

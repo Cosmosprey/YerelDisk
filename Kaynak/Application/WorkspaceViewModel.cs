@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
@@ -10,7 +10,7 @@ internal sealed record Choice(string Label, int Value);
 
 // All scan/filter/sort state belongs here, not in the visual controls. Engine objects
 // are reused directly; there is no per-file UI wrapper or per-file notification object.
-internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
+internal sealed partial class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
 {
     readonly IScanService scanService;
     public InventoryController Inventory { get; }
@@ -60,11 +60,12 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
 
     public WorkspaceViewModel() : this(new NativeScanService()) { }
     internal WorkspaceViewModel(IScanService scanService) : this(scanService, new RegistryInventoryProvider()) { }
-    internal WorkspaceViewModel(IScanService scanService, IInventoryProvider inventoryProvider)
+    internal WorkspaceViewModel(IScanService scanService, IInventoryProvider inventoryProvider, IRefreshService? refreshService = null)
     {
         this.scanService = scanService;
+        this.refreshService = refreshService ?? new NativeRefreshService();
         Inventory = new(inventoryProvider);
-        Inventory.PropertyChanged += (_, _) => { details = null; Notify(nameof(Details)); Notify(nameof(FullDetails)); Notify(nameof(DetailText)); };
+        Inventory.PropertyChanged += (_, _) => { details = null; Notify(nameof(Details)); Notify(nameof(FullDetails)); Notify(nameof(DetailText)); Notify(nameof(CanRemeasure)); Notify(nameof(RemeasureHint)); Notify(nameof(CanRefreshSelected)); };
         Roots.CollectionChanged += (_, _) => { Notify(nameof(RootsLabel)); StateChanged(); };
         Exclusions.CollectionChanged += (_, _) => Notify(nameof(RootsLabel));
     }
@@ -88,12 +89,12 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
     public bool ShowMetrics => view == WorkspaceView.Files || (view == WorkspaceView.Folders && !distributionMode);
     public ScanSummary? Summary { get; private set; }
     public bool ShowSummary => !IsSettings && !busy && Summary != null;
-    public bool ShowScopeNotice => !IsSettings && !busy && scan != null && (scan.ScopeChanged || scan.Failed || scan.Cancelled || scan.HasUnverified || scan.IssueCount > 0 || scan.UnknownAllocation > 0 || scan.ExcludedPaths.Count > 0);
-    public string ScopeNotice => scan == null ? "" : $"{ResultStatus(scan)} · {scan.IssueCount:N0} uyarı · {scan.UnverifiedPaths.Count:N0} doğrulanamayan konum · {scan.UnknownAllocation:N0} eksik alan / akış ölçümü. "
+    public bool ShowScopeNotice => !IsSettings && !busy && scan != null && (scan.HasMixedMeasurementTimes || scan.ScopeChanged || scan.Failed || scan.Cancelled || scan.HasUnverified || scan.IssueCount > 0 || scan.UnknownAllocation > 0 || scan.ExcludedPaths.Count > 0);
+    public string ScopeNotice => scan == null ? "" : (HasMixedMeasurements ? MeasurementNotice + "\n" : "") + $"{ResultStatus(scan)} · {scan.IssueCount:N0} uyarı · {scan.UnverifiedPaths.Count:N0} doğrulanamayan konum · {scan.UnknownAllocation:N0} eksik alan / akış ölçümü. "
         + (scan.ExcludedPaths.Count > 0 ? $"{scan.ExcludedPaths.Count:N0} yol bilerek hariç tutuldu; toplamlar bu alanları içermez. Hariç tutulan yollar F6 ve CSV'de listelenir. " : "")
         + "Ölçüm uyarıları Uyarılar görünümünde ve F6 içindedir.";
     public bool HasRows => rows.Count > 0;
-    public string CompactScopeNotice => scan == null ? "" : $"Ölçüm: {scan.IssueCount:N0} uyarı · {scan.UnverifiedPaths.Count:N0} doğrulanamayan · {scan.UnknownAllocation:N0} eksik alan/akış · {scan.ExcludedPaths.Count:N0} hariç yol. Ayrıntı: F6 / Uyarılar.";
+    public string CompactScopeNotice => scan == null ? "" : (HasMixedMeasurements ? "Karma ölçüm · Dış alanlar önceki ölçüm; referans için tümünü yeniden ölçün. " : "") + $"Ölçüm: {scan.IssueCount:N0} uyarı · {scan.UnverifiedPaths.Count:N0} doğrulanamayan · {scan.UnknownAllocation:N0} eksik alan/akış · {scan.ExcludedPaths.Count:N0} hariç yol. Ayrıntı: F6 / Uyarılar.";
     public bool IsEmpty => rows.Count == 0;
     public bool HasError => error.Length > 0;
     public string Error => error;
@@ -105,7 +106,8 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
     public string AllocatedSize { get; private set; } = "—";
     public string FileCount { get; private set; } = "—";
     public string Status => status;
-    public string ScanActionLabel => scan?.HasUnverified == true ? "Yeniden doğrula" : "Taramayı başlat";
+    public string ScanActionLabel => "Yeni tam tarama";
+    public string ScanActionHint => "Taranacak konumlar bölümündeki kökleri ve hariç yolları kullanarak baştan tam tarama başlatır; yalnız doğrulama yapmaz. Mevcut sonuç tarama başlarken kaldırılır. Eski sonucu yeni ölçüm hazır olana kadar korumak için Tümünü yeniden ölç kullanın.";
     public string FolderPath => view == WorkspaceView.Folders ? folder?.Path ?? "Taranan konum" : scan == null ? "Henüz tarama yok" : $"{scan.RootPaths.Count} kök · {scan.IssueCount:N0} uyarı · {scan.UnknownAllocation:N0} eksik ölçüm";
     public string AppliedSearch { get; private set; } = "";
     internal ViewQuery? AppliedQuery { get; private set; }
@@ -119,18 +121,19 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
     public string ListCaptionDetail => ListCaption + (IsReview && AppliedCounts is { } counts
         ? $"\nFiltre nedenleri: boyut {counts.BySize:N0} · tür {counts.ByKind:N0} · arama {counts.BySearch:N0}. Sıra boyut, tür, aramadır; her kayıt bir kez sayılır. Sayılar bu listeye aittir, tüm diskin dosya / klasör toplamı değildir." : "");
     public string EmptyMessage => busy ? "Dosya içerikleri açılmadan bilgiler taranıyor…" : scan == null ? "Alan kullanımını görmek için üstten klasör seçin ve taramayı başlatın."
-        : scan.ScopeChanged && scan.UnverifiedPaths.Count == 0 && IsReview ? "Kapsam değiştiği için adaylar gizlendi. Yeniden tarayın."
+        : scan.ScopeChanged && !scan.RootPaths.Any(scan.CanUsePath) && IsReview ? "Kapsam değiştiği için adaylar gizlendi. Yeniden tarayın."
+        : IsReview && (scan.Root.Measurement is MeasurementState.Unknown or MeasurementState.Previous || !scan.RootPaths.Any(scan.CanUsePath)) ? "Bu sonuçta doğrulanmış ölçüm yok; inceleme adayları gösterilemiyor. Uyarıları kontrol edip yeniden tarayın."
         : search.Length > 0 || (IsKnownReview && candidates.Count > 0) || (IsUnrecognized && unrecognizedAreas?.Folders.Count > 0) ? "Bu filtrelere uyan kayıt bulunamadı. Aramayı ve filtreleri kontrol edin."
         : IsUnrecognized ? "Bu filtrelerle listelenebilen başka alt ağaç yok. Köklerin / bölünen klasörlerin doğrudan dosyalarını Büyük dosyalar görünümünde inceleyin. Ölçülemeyen alanlar boş sayılmaz." : IsReview ? "Bu kapsamda kural eşleşmesi bulunamadı. Bu, gereksiz dosya olmadığı anlamına gelmez. Uyarılar ve tarama sınırları geçerlidir."
         : "Bu görünümde gösterilecek kayıt yok. Uyarılar ve tarama kapsamını da kontrol edin.";
 
-    public string Search { get => search; set { if (Set(ref search, value)) { Notify(nameof(EmptyMessage)); FiltersChanged(); } } }
+    public string Search { get => search; set { if (!remeasuring && Set(ref search, value)) { Notify(nameof(EmptyMessage)); FiltersChanged(); } } }
     public int Workers { get => workers; set { if (Set(ref workers, value)) Notify(nameof(WorkerHint)); } }
     public int FileLimit { get => fileLimit; set { if (Set(ref fileLimit, value)) Notify(nameof(LimitHint)); } }
-    public bool FullFolderPath { get => fullPath; set => Set(ref fullPath, value); }
+    public bool FullFolderPath { get => fullPath; set { if (!remeasuring) Set(ref fullPath, value); } }
     public bool TechnicalColumns { get => technical; set => Set(ref technical, value); }
-    public int ReviewMinimum { get => reviewMinimum; set { if (Set(ref reviewMinimum, value)) FiltersChanged(); } }
-    public int ReviewKindFilter { get => reviewKind; set { if (Set(ref reviewKind, value)) FiltersChanged(); } }
+    public int ReviewMinimum { get => reviewMinimum; set { if (!remeasuring && Set(ref reviewMinimum, value)) FiltersChanged(); } }
+    public int ReviewKindFilter { get => reviewKind; set { if (!remeasuring && Set(ref reviewKind, value)) FiltersChanged(); } }
     void FiltersChanged() { Notify(nameof(HasReviewFilters)); Notify(nameof(CanClearReviewFilters)); }
     public string WorkerHint => workers switch
     {
@@ -146,18 +149,25 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
         : "Daha kapsamlı liste daha fazla bellek ve arama/sıralama zamanı gerektirebilir. Yalnız daha küçük liste yetmiyorsa artırın; toplam ölçüm değişmez.")
         + " Tarama sırasında hedefli doğrulama için tüm dosyaların kısa metadata kayıtları geçici olarak bellekte tutulur; bu sınır sonuç listesine uygulanır.";
 
-    public object? SelectedRow { get => selection; set { if (Set(ref selection, value)) SelectionChanged(); } }
+    public object? SelectedRow { get => selection; set { if (!remeasuring && Set(ref selection, value)) SelectionChanged(); } }
     public string SelectionTitle => selection switch { FolderEntry f => f.Name, FileEntry f => f.Name, ReviewCandidate c => Path.GetFileName(c.Path.TrimEnd('\\')), ScanIssue => "Tarama uyarısı", _ => "Bir kayıt seçin" };
     public string? SelectedPath => selection switch { FolderEntry f => f.Path, FileEntry f => f.Path, ReviewCandidate c => c.Path, ScanIssue i => i.Path, _ => null };
-    public string Feedback { get => selection is ReviewCandidate c ? feedback.GetValueOrDefault(c.Path, "Değerlendirilmedi") : "Değerlendirilmedi"; set { if (selection is ReviewCandidate c) { feedback[c.Path] = value; SelectionChanged(); } } }
+    public string Feedback { get => selection is ReviewCandidate c ? feedback.GetValueOrDefault(c.Path, "Değerlendirilmedi") : "Değerlendirilmedi"; set { if (!remeasuring && selection is ReviewCandidate c) { feedback[c.Path] = value; SelectionChanged(); } } }
     internal string FeedbackFor(ReviewCandidate candidate) => feedback.GetValueOrDefault(candidate.Path, "Değerlendirilmedi");
-    public SelectionDetails Details => details ??= Inventory.Enrich(SelectionDetails.Create(scan, selection, IsReview, Feedback, ScopeText, IsUnrecognized), selection, IsReview);
+    public SelectionDetails Details => details ??= Inventory.Enrich(MeasurementProvenance.Enrich(SelectionDetails.Create(scan, selection, IsReview, Feedback, ScopeText, IsUnrecognized), scan, selection, MeasurementCompletedAt), selection, IsReview);
     public string DetailText => Details.PlainText;
     public string FullDetails => Details.FullText;
     public string ScopeText => scan == null ? "Henüz tarama yok." : $"{ResultStatus(scan)} · {scan.RootPaths.Count} kök · {scan.IssueCount:N0} uyarı · {scan.UnverifiedPaths.Count:N0} doğrulanamayan konum · {scan.RetryCount:N0} hedefli yeniden ölçüm · {scan.RefreshedFolders:N0} klasör yenilendi · {scan.UnknownAllocation:N0} öğede alan / akış ölçümü eksik · {scan.HardLinkAliases:N0} ek hard link adı tekrar sayılmadı."
         + (scan.ExcludedPaths.Count > 0 ? $" {scan.ExcludedPaths.Count} yol bilerek hariç tutuldu; toplamlar bunları içermez.\nHariç tutulan yollar (varlıkları / boyutları ölçülmedi):\n" + string.Join("\n", scan.ExcludedPaths) : "")
+        + (scan.HasMixedMeasurementTimes ? "\n" + MeasurementNotice + "\nÖnceki tam kapsam zamanı: " + MeasurementCompletedAt.ToLocalTime().ToString("g")
+            + "\nAlan yenilemeleri:\n" + string.Join("\n", scan.RefreshedAreas.Select(area => area.Path + " · " + area.MeasuredAt.ToLocalTime().ToString("g"))) : "")
         + "\n" + ReviewText.Limits;
     internal ScanResult? Scan => scan;
+    internal FolderEntry? PopulationTarget => IsFolderView ? selection as FolderEntry ?? folder : null;
+    public bool CanAnalyzePopulation => CanSearch && !refreshing && PopulationTarget != null;
+    public string PopulationActionHint => PopulationTarget is { } target ? "Dosya sayısı ve uzantı özeti · " + target.Path : "Klasör görünümünde bir tarama yapın.";
+    internal DateTimeOffset MeasurementCompletedAt { get; private set; }
+    public bool CanCompareMeasurements => !busy && scan != null && FolderMeasurements.CanCapture(scan);
     internal Task CurrentScan { get; private set; } = Task.CompletedTask;
     internal string SortKey => sortKey;
     internal bool SortDescending => descending;
@@ -165,6 +175,7 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
 
     public async Task SetViewAsync(WorkspaceView next)
     {
+        if (remeasuring || disposed) return;
         if (view != next)
         {
             viewStates[view] = new(search, sortKey, descending, selection);
@@ -203,9 +214,13 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
         var source = new CancellationTokenSource();
         scanCancellation = source;
         int version = ++scanVersion, count = workers, limit = fileLimit;
+        long indexBudget = RefreshIndexBudget;
         busy = true; error = ""; scan = null; Summary = null; Distribution = SpaceDistribution.Empty; folder = null; candidates = []; unrecognizedAreas = null; feedback.Clear(); viewStates.Clear(); reviewStates.Clear(); preferredSelection = null; rows = Array.Empty<object>(); selection = null;
         if (view == WorkspaceView.Settings) view = WorkspaceView.Folders;
+        sortKey = view == WorkspaceView.Issues ? "Path" : "Size";
+        descending = view != WorkspaceView.Issues;
         search = ""; AppliedSearch = ""; AppliedQuery = null; AppliedCounts = null; LogicalSize = AllocatedSize = FileCount = "—";
+        RefreshDecisionNotice = "";
         status = "Dosya bilgileri taranıyor…";
         NotifyAll();
         var progress = new Progress<ScanProgress>(p =>
@@ -217,7 +232,7 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
         });
         try
         {
-            var completed = await scanService.ScanAsync(new ScanRequest(roots, count, limit, excluded), progress, source.Token);
+            var completed = await scanService.ScanAsync(new ScanRequest(roots, count, limit, excluded, indexBudget), progress, source.Token);
             if (disposed || version != scanVersion) return;
             ApplyOutcome(completed);
         }
@@ -230,6 +245,20 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
     public void ShowError(string message) { error = message; Notify(nameof(Error)); Notify(nameof(HasError)); }
     public void ClearError() { error = ""; Notify(nameof(Error)); Notify(nameof(HasError)); }
     public async Task GoUpAsync() { if (CanGoUp) await BrowseAsync(folder!.Parent!); }
+    internal async Task<bool> InspectComparisonFolderAsync(ScanResult expectedScan, string path)
+    {
+        if (disposed || busy || !ReferenceEquals(scan, expectedScan)
+            || ComparisonInspection.FindMeasuredFolder(expectedScan, path) is not { } target) return false;
+        // A navigation request supersedes a pending search/filter publication.
+        CancelRefresh();
+        viewStates[view] = new(search, sortKey, descending, selection);
+        view = WorkspaceView.Folders; distributionMode = false;
+        sortKey = "Size"; descending = true;
+        ClearError();
+        await BrowseAsync(target);
+        return !disposed && !busy && view == WorkspaceView.Folders
+            && ReferenceEquals(scan, expectedScan) && ReferenceEquals(folder, target);
+    }
     public async Task EnterAsync(FolderEntry target)
     {
         if (!disposed && !busy && !refreshing && (view == WorkspaceView.Folders || IsUnrecognized) && scan?.CanUsePath(target.Path) == true
@@ -268,6 +297,7 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
     }
     public Task SortAsync(string key)
     {
+        if (remeasuring || disposed) return Task.CompletedTask;
         descending = sortKey == key ? !descending : key is "Size" or "Allocated" or "Modified";
         sortKey = key;
         return RefreshAsync();
@@ -329,7 +359,7 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
     void SelectionChanged() { details = null; Notify(nameof(Details)); Notify(nameof(SelectionTitle)); Notify(nameof(SelectedPath)); Notify(nameof(DetailText)); Notify(nameof(FullDetails)); Notify(nameof(Feedback)); StateChanged(); }
     void StateChanged()
     {
-        foreach (string name in new[] { nameof(IsBusy), nameof(IsRefreshing), nameof(CanScan), nameof(CanStop), nameof(CanConfigure), nameof(CanSearch), nameof(CanExport), nameof(CanUseSelection), nameof(CanGoUp), nameof(ListCaption), nameof(ListCaptionDetail), nameof(HasReviewFilters), nameof(CanClearReviewFilters), nameof(EmptyMessage), nameof(CanSwitchPresentation), nameof(CanUseDistribution) }) Notify(name);
+        foreach (string name in new[] { nameof(IsBusy), nameof(IsRemeasuring), nameof(IsRefreshing), nameof(CanRemeasure), nameof(RemeasureHint), nameof(CanRefreshSelected), nameof(RefreshSelectionHint), nameof(RefreshActionLabel), nameof(RefreshTargetNotice), nameof(ShowRefreshTarget), nameof(CanCompareMeasurements), nameof(ComparisonHint), nameof(CanScan), nameof(CanStop), nameof(CanConfigure), nameof(CanSearch), nameof(CanExport), nameof(CanUseSelection), nameof(CanGoUp), nameof(ListCaption), nameof(ListCaptionDetail), nameof(HasReviewFilters), nameof(CanClearReviewFilters), nameof(EmptyMessage), nameof(CanSwitchPresentation), nameof(CanUseDistribution), nameof(CanAnalyzePopulation), nameof(PopulationActionHint) }) Notify(name);
     }
     void NotifyAll()
     {
@@ -347,6 +377,7 @@ internal sealed class WorkspaceViewModel : INotifyPropertyChanged, IDisposable
     void ApplyOutcome(ScanOutcome outcome)
     {
         scan = outcome.Scan; folder = scan.Root; candidates = outcome.Candidates; selection = null;
+        MeasurementCompletedAt = DateTimeOffset.UtcNow;
         Inventory.Bind(scan);
         var result = outcome.Scan;
         Summary = ScanSummary.Create(result);
