@@ -7,6 +7,10 @@ This source/package update collects local changes since the last public release,
 
 ### Corrections after source review
 
+- Increase the comparison dialog's minimum height from 500 to 540 DIPs so
+  compact layouts retain two table rows across Windows frame/font differences.
+  Its default size and the existing layout assertion remain unchanged.
+
 - Same-root, non-hard-linked duplicate file identities contribute once to count,
   logical size and top-K. The largest observation is retained as explicitly
   uncertain; this is not a claim about the current path or latest version.
